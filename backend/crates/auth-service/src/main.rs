@@ -1,8 +1,7 @@
+mod db;
 mod jwt;
-use std::{
-    clone,
-    env::{self, var},
-};
+mod requests;
+use std::{clone, env::var};
 
 use axum::{
     Json, Router,
@@ -16,7 +15,11 @@ use serde_json::json;
 use sqlx::PgPool;
 use tokio::net::TcpListener;
 
-use crate::jwt::{Claims, User, decode_jwt};
+use crate::{
+    db::find_user_by_email,
+    jwt::{Claims, decode_jwt, verify_password},
+    requests::LoginRequest,
+};
 
 #[derive(clone::Clone)]
 struct AppState {
@@ -53,38 +56,76 @@ async fn main() {
         .expect("Error serving application");
 }
 
-async fn login_handler(State(state): State<AppState>, Json(user): Json<User>) -> Response<String> {
-    let token = jwt::get_jwt(user, state.jwt_secret);
+async fn login_handler(
+    State(state): State<AppState>,
+    Json(request): Json<LoginRequest>,
+) -> Response<String> {
+    let user = match find_user_by_email(&state.pool, &request.email).await {
+        Ok(user) => user,
+        Err(sqlx::Error::RowNotFound) => return unauthorized("invalid credentials"),
+        Err(_) => return server_error("internal error"),
+    };
 
-    match token {
-        Ok(token) => Response::builder()
-            .status(200)
-            .header(header::CONTENT_TYPE, "application/json")
-            .body(
-                json!({
-                    "success": true,
-                    "data": {
-                        "token": token.to_string(),
-                    }
-                })
-                .to_string(),
-            )
-            .unwrap_or_default(),
+    match verify_password(&request.password, &user.password_hash) {
+        true => {
+            let token = jwt::get_jwt(user, state.jwt_secret);
 
-        Err(e) => Response::builder()
-            .status(401)
-            .header(header::CONTENT_TYPE, "application/json")
-            .body(
-                json!({
-                    "success": false,
-                    "data": {
-                        "message": e
-                    }
-                })
-                .to_string(),
-            )
-            .unwrap_or_default(),
+            match token {
+                Ok(token) => success(&token.to_string()),
+
+                Err(e) => unauthorized(&e.to_string()),
+            }
+        }
+        false => unauthorized("invalid credentials"),
     }
+}
+
+fn success(msg: &str) -> Response<String> {
+    Response::builder()
+        .status(200)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(
+            json!({
+                "success": true,
+                "data": {
+                    "message": msg
+                }
+            })
+            .to_string(),
+        )
+        .unwrap_or_default()
+}
+
+fn unauthorized(msg: &str) -> Response<String> {
+    Response::builder()
+        .status(401)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(
+            json!({
+                "success": false,
+                "data": {
+                    "message": msg
+                }
+            })
+            .to_string(),
+        )
+        .unwrap_or_default()
+}
+
+fn server_error(msg: &str) -> Response<String> {
+    Response::builder()
+        .status(500)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(
+            json!({
+                "success": false,
+                "data": {
+                    "message": msg
+                }
+            })
+            .to_string(),
+        )
+        .unwrap_or_default()
 }
 
 async fn me_handler(Auth(claims): Auth) -> Response<String> {
@@ -127,35 +168,11 @@ where
                 match claims {
                     Ok(claims) => Ok(Auth(claims)),
 
-                    Err(e) => Err(Response::builder()
-                        .status(401)
-                        .header(header::CONTENT_TYPE, "application/json")
-                        .body(
-                            json!({
-                                "success": false,
-                                "data": {
-                                    "message": e
-                                }
-                            })
-                            .to_string(),
-                        )
-                        .unwrap_or_default()),
+                    Err(e) => Err(unauthorized(&e.to_string())),
                 }
             }
 
-            None => Err(Response::builder()
-                .status(401)
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(
-                    json!({
-                        "success": false,
-                        "data": {
-                            "message": "No token provided"
-                        }
-                    })
-                    .to_string(),
-                )
-                .unwrap_or_default()),
+            None => Err(unauthorized("No token provided")),
         }
     }
 }
