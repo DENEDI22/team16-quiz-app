@@ -1,3 +1,5 @@
+use std::env::var;
+
 use axum::{
     extract::{FromRequest, FromRequestParts},
     http::{Response, header},
@@ -13,8 +15,9 @@ pub enum UserRole {
     Admin,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct User {
+    id: uuid::Uuid,
     email: String,
     password: String,
 }
@@ -26,7 +29,13 @@ pub struct Claims {
     exp: i64,
 }
 
-pub fn get_jwt(user: User) -> Result<String, String> {
+#[derive(Deserialize, Serialize)]
+pub struct LoginRequest {
+    email: String,
+    password: String,
+}
+
+pub fn get_jwt(user: User, secret: String) -> Result<String, String> {
     let token = encode(
         &Header::default(),
         &Claims {
@@ -34,7 +43,7 @@ pub fn get_jwt(user: User) -> Result<String, String> {
             role: UserRole::Admin,
             exp: (Utc::now() + Duration::minutes(10)).timestamp(),
         },
-        &EncodingKey::from_secret("team-16-secret-key".as_bytes()),
+        &EncodingKey::from_secret(secret.as_bytes()),
     )
     .map_err(|e| e.to_string());
 
