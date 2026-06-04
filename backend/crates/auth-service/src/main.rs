@@ -16,9 +16,9 @@ use sqlx::PgPool;
 use tokio::net::TcpListener;
 
 use crate::{
-    db::find_user_by_email,
-    jwt::{Claims, decode_jwt, verify_password},
-    requests::LoginRequest,
+    db::{create_user, find_user_by_email},
+    jwt::{Claims, User, decode_jwt, hash_password, verify_password},
+    requests::{LoginRequest, RegisterRequest},
 };
 
 #[derive(clone::Clone)]
@@ -56,6 +56,19 @@ async fn main() {
         .expect("Error serving application");
 }
 
+async fn register_handler(
+    State(state): State<AppState>,
+    Json(request): Json<RegisterRequest>,
+) -> Response<String> {
+    match find_user_by_email(&state.pool, &request.email).await {
+        Ok(user) => return conflict("User with this email already exists"),
+        Err(sqlx::Error::RowNotFound) => {
+            let hash = hash_password(&request.password);
+            match create_user(&state.pool, &request.email, &hash, &request.username) {}
+        }
+        Err(_) => return server_error("internal error"),
+    };
+}
 async fn login_handler(
     State(state): State<AppState>,
     Json(request): Json<LoginRequest>,
@@ -78,6 +91,22 @@ async fn login_handler(
         }
         false => unauthorized("invalid credentials"),
     }
+}
+
+fn conflict(msg: &str) -> Response<String> {
+    Response::builder()
+        .status(409)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(
+            json!({
+                "success": false,
+                "data": {
+                    "message": msg
+                }
+            })
+            .to_string(),
+        )
+        .unwrap_or_default()
 }
 
 fn success(msg: &str) -> Response<String> {
