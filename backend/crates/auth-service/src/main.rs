@@ -12,12 +12,14 @@ use axum::{
 };
 use dotenvy::dotenv;
 use serde_json::json;
+use shared::jwt::{Claims, decode_jwt};
 use sqlx::PgPool;
 use tokio::net::TcpListener;
 
+use crate::db::get_user;
 use crate::{
     db::{create_user, find_user_by_email},
-    jwt::{Claims, User, decode_jwt, hash_password, verify_password},
+    jwt::{hash_password, verify_password},
     requests::{LoginRequest, RegisterRequest},
 };
 
@@ -60,22 +62,25 @@ async fn register_handler(
     State(state): State<AppState>,
     Json(request): Json<RegisterRequest>,
 ) -> Response<String> {
-    match find_user_by_email(&state.pool, &request.email).await {
-        Ok(user) => return conflict("User with this email already exists"),
-        Err(sqlx::Error::RowNotFound) => {
-            let hash = hash_password(&request.password).unwrap();
-            match create_user(&state.pool, &request.email, &hash, &request.username).await {
-                Ok(user_id) => {
-                    return success(&format!("User registered successfully, Id is {user_id}"));
-                }
-                Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
-                    return conflict("User with this email already exists");
-                }
+    let hash = hash_password(&request.password).unwrap();
+    match create_user(&state.pool, &request.email, &hash, &request.username).await {
+        Ok(user_id) => {
+            let user = match get_user(&state.pool, &user_id).await {
+                Ok(user) => user,
+                Err(sqlx::Error::RowNotFound) => return unauthorized("invalid credentials"),
                 Err(e) => return server_error(&e.to_string()),
+            };
+            let token = jwt::get_jwt(user, state.jwt_secret);
+            match token {
+                Ok(token) => return token_response(&token.to_string()),
+                Err(e) => return unauthorized(&e.to_string()),
             }
         }
-        Err(_) => return server_error("internal error"),
-    };
+        Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
+            return conflict("User with this email already exists");
+        }
+        Err(e) => return server_error(&e.to_string()),
+    }
 }
 async fn login_handler(
     State(state): State<AppState>,
@@ -111,6 +116,20 @@ fn conflict(msg: &str) -> Response<String> {
                 "data": {
                     "message": msg
                 }
+            })
+            .to_string(),
+        )
+        .unwrap_or_default()
+}
+
+fn token_response(token: &str) -> Response<String> {
+    Response::builder()
+        .status(200)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(
+            json!({
+                "success": true,
+                "token": token,
             })
             .to_string(),
         )
@@ -213,6 +232,7 @@ where
         }
     }
 }
+
 async fn health() -> impl IntoResponse {
     "healthy"
 }

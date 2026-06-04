@@ -5,15 +5,10 @@ use argon2::{
     password_hash::{SaltString, rand_core::OsRng},
 };
 use chrono::{Duration, Utc};
-use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode};
+use jsonwebtoken::{EncodingKey, Header, encode};
 use serde::{Deserialize, Serialize};
+use shared::jwt::{Claims, UserRole};
 use sqlx::prelude::FromRow;
-
-#[derive(Deserialize, Serialize)]
-pub enum UserRole {
-    User,
-    Admin,
-}
 
 #[derive(FromRow, Deserialize, Serialize)]
 pub struct User {
@@ -22,13 +17,6 @@ pub struct User {
     pub(crate) password_hash: String,
     username: String,
     is_admin: bool,
-}
-
-#[derive(Deserialize, Serialize)]
-pub struct Claims {
-    email: String,
-    role: UserRole,
-    exp: i64,
 }
 
 pub fn verify_password(password: &str, hash: &str) -> bool {
@@ -66,18 +54,4 @@ pub fn get_jwt(user: User, secret: String) -> Result<String, String> {
     .map_err(|e| e.to_string());
 
     token
-}
-
-pub fn decode_jwt(token: &str, secret: String) -> Result<Claims, String> {
-    let token_data = decode::<Claims>(
-        token,
-        &DecodingKey::from_secret(secret.as_bytes()),
-        &Validation::default(),
-    );
-
-    match token_data {
-        Ok(token_data) => Ok(token_data.claims),
-
-        Err(e) => Err(e.to_string()),
-    }
 }

@@ -62,6 +62,7 @@ dependencies = [
  "rand_core 0.10.1",
  "serde",
  "serde_json",
+ "shared",
  "sqlx",
  "tokio",
  "uuid",
@@ -1665,6 +1666,8 @@ dependencies = [
 name = "shared"
 version = "0.1.0"
 dependencies = [
+ "chrono",
+ "jsonwebtoken",
  "serde",
  "serde_json",
 ]
