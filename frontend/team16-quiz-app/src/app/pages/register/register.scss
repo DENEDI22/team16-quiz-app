@@ -29,6 +29,21 @@
   padding: 1rem;
 }
 
+.logo-link {
+  width: 172px;
+  min-height: 84px;
+  margin: 0 auto 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logo-link img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
 .full-width {
   width: 100%;
 }

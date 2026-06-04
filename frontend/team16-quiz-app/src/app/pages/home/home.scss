@@ -37,10 +37,16 @@
 }
 
 .brand {
-  font-size: 1.05rem;
-  font-weight: 800;
-  letter-spacing: 0;
-  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  width: 134px;
+  min-height: 58px;
+}
+
+.brand img {
+  width: 100%;
+  height: auto;
+  display: block;
 }
 
 .nav-actions,
@@ -169,6 +175,11 @@ h1 {
 
   .topbar {
     align-items: flex-start;
+  }
+
+  .brand {
+    width: 96px;
+    min-height: 44px;
   }
 
   .nav-actions {

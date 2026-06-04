@@ -27,6 +27,21 @@
     0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
+.logo-link {
+  width: 172px;
+  min-height: 84px;
+  margin: 0 auto 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logo-link img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
 form {
   display: flex;
   flex-direction: column;
