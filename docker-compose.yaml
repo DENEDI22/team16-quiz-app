@@ -22,5 +22,18 @@ services:
     depends_on:
       - db-quiz-app
 
+  quiz-service:
+    build:
+      context: ./backend/
+      dockerfile: ./crates/quiz-service/dockerfile
+    environment:
+      DATABASE_URL: postgres://admin:Start123!@db-quiz-app:5432/quiz-service-db
+      CRON_JOB: "0 0 * * * *"
+      ADDRESS: "0.0.0.0:3000"
+    ports:
+      - "4000:3000"
+    depends_on:
+      - db-quiz-app
+
 volumes:
   pgdata:
