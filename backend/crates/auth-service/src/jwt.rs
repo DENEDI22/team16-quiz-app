@@ -68,10 +68,10 @@ pub fn get_jwt(user: User, secret: String) -> Result<String, String> {
     token
 }
 
-pub fn decode_jwt(token: &str) -> Result<Claims, String> {
+pub fn decode_jwt(token: &str, secret: String) -> Result<Claims, String> {
     let token_data = decode::<Claims>(
         token,
-        &DecodingKey::from_secret("team-16-secret-key".as_bytes()),
+        &DecodingKey::from_secret(secret.as_bytes()),
         &Validation::default(),
     );
 

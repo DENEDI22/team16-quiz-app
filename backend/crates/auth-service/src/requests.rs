@@ -10,5 +10,5 @@ pub struct LoginRequest {
 pub struct RegisterRequest {
     pub(crate) email: String,
     pub(crate) password: String,
-    username: String,
+    pub(crate) username: String,
 }

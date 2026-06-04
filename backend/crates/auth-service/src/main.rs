@@ -41,7 +41,7 @@ async fn main() {
 
     let app = Router::new()
         .route("/health", get(health))
-        .route("/register", post(|| async { "Register" }))
+        .route("/register", post(register_handler))
         .route("/login", post(login_handler))
         .route("/me", get(me_handler))
         .with_state(state);
@@ -63,8 +63,16 @@ async fn register_handler(
     match find_user_by_email(&state.pool, &request.email).await {
         Ok(user) => return conflict("User with this email already exists"),
         Err(sqlx::Error::RowNotFound) => {
-            let hash = hash_password(&request.password);
-            match create_user(&state.pool, &request.email, &hash, &request.username) {}
+            let hash = hash_password(&request.password).unwrap();
+            match create_user(&state.pool, &request.email, &hash, &request.username).await {
+                Ok(user_id) => {
+                    return success(&format!("User registered successfully, Id is {user_id}"));
+                }
+                Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
+                    return conflict("User with this email already exists");
+                }
+                Err(e) => return server_error(&e.to_string()),
+            }
         }
         Err(_) => return server_error("internal error"),
     };
@@ -76,7 +84,7 @@ async fn login_handler(
     let user = match find_user_by_email(&state.pool, &request.email).await {
         Ok(user) => user,
         Err(sqlx::Error::RowNotFound) => return unauthorized("invalid credentials"),
-        Err(_) => return server_error("internal error"),
+        Err(e) => return server_error(&e.to_string()),
     };
 
     match verify_password(&request.password, &user.password_hash) {
@@ -192,7 +200,7 @@ where
 
         match access_token {
             Some(token) => {
-                let claims = decode_jwt(token);
+                let claims = decode_jwt(token, var("JWT_SECRET").unwrap());
 
                 match claims {
                     Ok(claims) => Ok(Auth(claims)),
