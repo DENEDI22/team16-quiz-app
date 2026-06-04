@@ -85,7 +85,7 @@
           color="primary"
           type="submit"
           class="full-width"
-          [disabled]="isLoading()"
+          [disabled]="isLoading() || registerForm.invalid"
         >
           @if (isLoading()) {
             Registrierung läuft...
