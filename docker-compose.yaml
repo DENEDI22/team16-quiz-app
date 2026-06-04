@@ -4,12 +4,13 @@ services:
     ports:
       - 5432:5432
     environment:
-      POSTGRES_USER: admin 
-      POSTGRES_PASSWORD: Start123! 
-      POSTGRES_DB: default_database 
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: Start123!
+      POSTGRES_DB: default_database
     volumes:
       - ./db-data/:/var/lib/postgresql/
 
+<<<<<<< HEAD
   auth:
     build:
       context: ./backend/
@@ -24,3 +25,15 @@ services:
 
 volumes:
   pgdata:
+=======
+  db-quiz-service:
+    image: "postgres:latest"
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: Start123!
+      POSTGRES_DB: quiz-service
+    volumes:
+      - ./db-data/:/var/lib/postgresql/
+>>>>>>> 9b27728 (-Moved config to .env)
