@@ -16,7 +16,7 @@ use shared::jwt::{Claims, decode_jwt};
 use sqlx::PgPool;
 use tokio::net::TcpListener;
 
-use crate::db::get_user;
+use crate::db::{get_user, migrate};
 use crate::{
     db::{create_user, find_user_by_email},
     jwt::{hash_password, verify_password},
@@ -38,7 +38,7 @@ async fn main() {
         .connect(&var("DATABASE_URL").unwrap())
         .await
         .expect("Database connection failed");
-
+    migrate(&pool).await.expect("Migration failed");
     let state = AppState { pool, jwt_secret };
 
     let app = Router::new()

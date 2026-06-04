@@ -3,7 +3,25 @@ use uuid::Uuid;
 
 use crate::jwt::User;
 
-fn migrate() {}
+pub async fn migrate(pool: &PgPool) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "
+CREATE TABLE IF NOT EXISTS public.users (
+	id uuid DEFAULT gen_random_uuid() NOT NULL,
+	email varchar NOT NULL,
+	username varchar NOT NULL,
+	password_hash varchar NOT NULL,
+	is_admin bool DEFAULT false NOT NULL,
+	is_deleted bool DEFAULT false NOT NULL,
+	CONSTRAINT email_unique UNIQUE (email),
+	CONSTRAINT users_pk PRIMARY KEY (id)
+)
+ ",
+    )
+    .execute(pool)
+    .await?;
+    Ok(())
+}
 
 pub async fn get_user(pool: &PgPool, id: &Uuid) -> Result<User, sqlx::Error> {
     sqlx::query_as(
