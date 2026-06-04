@@ -1,46 +1,52 @@
 use std::env::var;
 
-use axum::{
-    extract::{FromRequest, FromRequestParts},
-    http::{Response, header},
+use argon2::{
+    Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
+    password_hash::{SaltString, rand_core::OsRng},
 };
 use chrono::{Duration, Utc};
-use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode};
+use jsonwebtoken::{EncodingKey, Header, encode};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use shared::jwt::{Claims, UserRole};
+use sqlx::prelude::FromRow;
 
-#[derive(Deserialize, Serialize)]
-pub enum UserRole {
-    User,
-    Admin,
-}
-
-#[derive(Deserialize, Serialize)]
+#[derive(FromRow, Deserialize, Serialize)]
 pub struct User {
     id: uuid::Uuid,
     email: String,
-    password: String,
+    pub(crate) password_hash: String,
+    username: String,
+    is_admin: bool,
 }
 
-#[derive(Deserialize, Serialize)]
-pub struct Claims {
-    email: String,
-    role: UserRole,
-    exp: i64,
+pub fn verify_password(password: &str, hash: &str) -> bool {
+    let Ok(parsed) = PasswordHash::new(hash) else {
+        return false;
+    };
+    Argon2::default()
+        .verify_password(password.as_bytes(), &parsed)
+        .is_ok()
 }
 
-#[derive(Deserialize, Serialize)]
-pub struct LoginRequest {
-    email: String,
-    password: String,
+pub fn hash_password(password: &str) -> Result<String, String> {
+    let salt = SaltString::generate(&mut OsRng);
+    Argon2::default()
+        .hash_password(password.as_bytes(), &salt)
+        .map(|h| h.to_string())
+        .map_err(|e| e.to_string())
 }
 
 pub fn get_jwt(user: User, secret: String) -> Result<String, String> {
+    let user_role = if user.is_admin {
+        UserRole::Admin
+    } else {
+        UserRole::User
+    };
     let token = encode(
         &Header::default(),
         &Claims {
             email: user.email,
-            role: UserRole::Admin,
+            role: user_role,
             exp: (Utc::now() + Duration::minutes(10)).timestamp(),
         },
         &EncodingKey::from_secret(secret.as_bytes()),
@@ -48,18 +54,4 @@ pub fn get_jwt(user: User, secret: String) -> Result<String, String> {
     .map_err(|e| e.to_string());
 
     token
-}
-
-pub fn decode_jwt(token: &str) -> Result<Claims, String> {
-    let token_data = decode::<Claims>(
-        token,
-        &DecodingKey::from_secret("team-16-secret-key".as_bytes()),
-        &Validation::default(),
-    );
-
-    match token_data {
-        Ok(token_data) => Ok(token_data.claims),
-
-        Err(e) => Err(e.to_string()),
-    }
 }
