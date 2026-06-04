@@ -15,7 +15,7 @@ services:
       context: ./backend/
       dockerfile: ./crates/auth-service/dockerfile
     environment:
-      DATABASE_URL: postgres://admin:Start123!@postgres:5432/auth
+      DATABASE_URL: postgres://admin:Start123!@localhost:5432/quiz-auth
       JWT_SECRET: dev-only-secret
     ports:
       - "3000:3000"
