@@ -1,8 +1,5 @@
-mod config;
 mod db;
 mod scraper;
-
-use std::sync::Arc;
 
 use axum::{
     Json, Router,
@@ -14,16 +11,10 @@ use axum::{
 use serde_json::json;
 use sqlx::PgPool;
 use tokio::net::TcpListener;
-use tokio::sync::Mutex;
 use tokio_cron_scheduler::{Job, JobScheduler};
-
-use crate::scraper::Question;
-
-type SharedQuestions = Arc<Mutex<Vec<Question>>>;
 
 #[derive(Clone)]
 struct AppState {
-    questions: SharedQuestions,
     pool: PgPool,
 }
 
@@ -31,58 +22,49 @@ struct AppState {
 async fn main() {
     tracing_subscriber::fmt::init();
 
-    let config_path = std::env::var("QUIZ_CONFIG").unwrap_or_else(|_| "config.toml".to_string());
-    let cfg = config::Config::load(&config_path).expect("Failed to load config.toml");
+    // DATABASE_URL=postgres://(user)):(password)!@(address))/(db)
+    dotenvy::dotenv().ok();
+    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
-    let pool = db::create_pool(&cfg.database.url)
+    let pool = db::create_pool(&database_url)
         .await
         .expect("Failed to connect to database");
-    db::migrate(&pool).await.expect("Failed to run migrations");
+    db::create_table(&pool)
+        .await
+        .expect("Failed to create table");
 
-    let questions: SharedQuestions = Arc::new(Mutex::new(Vec::new()));
-
-    // Pre-fill from DB so memory state survives restarts
-    match db::load_questions(&pool).await {
-        Ok(existing) => {
-            tracing::info!("Loaded {} questions from database", existing.len());
-            *questions.lock().await = existing;
-        }
-        Err(e) => tracing::error!("Failed to load questions from DB: {}", e),
-    }
-
-    let state = AppState {
-        questions: Arc::clone(&questions),
-        pool: pool.clone(),
-    };
-
-    run_scrape(&state.questions, &pool).await;
-    start_cron(Arc::clone(&questions), pool).await;
+    run_scrape(&pool).await;
+    start_cron(pool.clone()).await;
 
     let app = Router::new()
         .route("/health", get(health))
-        .route("/questions", get(get_questions))
+        .route("/questions", get(get_question))
         .route("/scrape", post(manual_scrape))
-        .with_state(state);
+        .with_state(AppState { pool });
 
-    let listener = TcpListener::bind("0.0.0.0:3001")
+    // 0.0.0.0:(port)
+    let address = std::env::var("ADDRESS").expect("ADDRESS must be set");
+    let listener = TcpListener::bind(&address)
         .await
         .expect("Address must be free and valid");
-    tracing::info!("quiz-service listening on 0.0.0.0:3001");
+    tracing::info!("quiz-service listening on {}", address);
     axum::serve(listener, app)
         .await
         .expect("Error serving application");
 }
 
-async fn start_cron(questions: SharedQuestions, pool: PgPool) {
+async fn start_cron(pool: PgPool) {
     let scheduler = JobScheduler::new()
         .await
         .expect("Failed to create scheduler");
 
-    let job = Job::new_async("0 0 * * * *", move |_uuid, _lock| {
-        let questions = Arc::clone(&questions);
+    // CRON_JOB="0 0 * * * *"
+    let cron_job = std::env::var("CRON_JOB").expect("CRON_JOB must be set");
+
+    let job = Job::new_async(cron_job, move |_uuid, _lock| {
         let pool = pool.clone();
         Box::pin(async move {
-            run_scrape(&questions, &pool).await;
+            run_scrape(&pool).await;
         })
     })
     .expect("Failed to create cron job");
@@ -91,34 +73,36 @@ async fn start_cron(questions: SharedQuestions, pool: PgPool) {
     scheduler.start().await.expect("Failed to start scheduler");
 }
 
-async fn run_scrape(questions: &SharedQuestions, pool: &PgPool) {
+async fn run_scrape(pool: &PgPool) {
     tracing::info!("Scraping questions from OpenTDB...");
     match scraper::fetch_questions(50).await {
-        Ok(new_questions) => {
-            match db::insert_questions(pool, &new_questions).await {
-                Ok(inserted) => tracing::info!("Persisted {} new questions to DB", inserted),
-                Err(e) => tracing::error!("DB insert failed: {}", e),
-            }
-            let count = new_questions.len();
-            let mut lock = questions.lock().await;
-            lock.extend(new_questions);
-            tracing::info!("Scraped {}. Total in memory: {}", count, lock.len());
-        }
+        Ok(questions) => match db::insert_questions(pool, &questions).await {
+            Ok(inserted) => tracing::info!("Persisted {} new questions to DB", inserted),
+            Err(e) => tracing::error!("DB insert failed: {}", e),
+        },
         Err(e) => tracing::error!("Scrape failed: {}", e),
     }
 }
 
-async fn get_questions(State(state): State<AppState>) -> impl IntoResponse {
-    let lock = state.questions.lock().await;
-    Json(json!({
-        "success": true,
-        "count": lock.len(),
-        "data": *lock,
-    }))
+async fn get_question(State(state): State<AppState>) -> impl IntoResponse {
+    match db::get_random_question(&state.pool).await {
+        Ok(Some(q)) => (StatusCode::OK, Json(json!({ "success": true, "data": q }))),
+        Ok(None) => (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "success": false, "message": "No questions in database yet" })),
+        ),
+        Err(e) => {
+            tracing::error!("DB error: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "success": false, "message": "Database error" })),
+            )
+        }
+    }
 }
 
 async fn manual_scrape(State(state): State<AppState>) -> impl IntoResponse {
-    run_scrape(&state.questions, &state.pool).await;
+    run_scrape(&state.pool).await;
     (
         StatusCode::OK,
         Json(json!({ "success": true, "message": "Scrape triggered" })),

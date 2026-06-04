@@ -4,9 +4,19 @@ services:
     ports:
       - 5432:5432
     environment:
-      POSTGRES_USER: admin 
-      POSTGRES_PASSWORD: Start123! 
-      POSTGRES_DB: default_database 
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: Start123!
+      POSTGRES_DB: default_database
     volumes:
       - ./db-data/:/var/lib/postgresql/
 
+  db-quiz-service:
+    image: "postgres:latest"
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: Start123!
+      POSTGRES_DB: quiz-service
+    volumes:
+      - ./db-data/:/var/lib/postgresql/

@@ -6,7 +6,7 @@ pub async fn create_pool(url: &str) -> Result<PgPool, sqlx::Error> {
     PgPoolOptions::new().max_connections(5).connect(url).await
 }
 
-pub async fn migrate(pool: &PgPool) -> Result<(), sqlx::Error> {
+pub async fn create_table(pool: &PgPool) -> Result<(), sqlx::Error> {
     sqlx::query(
         "CREATE TABLE IF NOT EXISTS questions (
             id              SERIAL PRIMARY KEY,
@@ -44,10 +44,11 @@ pub async fn insert_questions(pool: &PgPool, questions: &[Question]) -> Result<u
     Ok(inserted)
 }
 
-pub async fn load_questions(pool: &PgPool) -> Result<Vec<Question>, sqlx::Error> {
+pub async fn get_random_question(pool: &PgPool) -> Result<Option<Question>, sqlx::Error> {
     sqlx::query_as::<_, Question>(
-        "SELECT category, difficulty, question, correct_answer, incorrect_answers FROM questions",
+        "SELECT category, difficulty, question, correct_answer, incorrect_answers
+         FROM questions ORDER BY RANDOM() LIMIT 1",
     )
-    .fetch_all(pool)
+    .fetch_optional(pool)
     .await
 }

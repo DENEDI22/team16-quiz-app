@@ -11,6 +11,6 @@ serde_json = "1.0"
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "macros", "postgres"] }
 tokio = { version = "1", features = ["full"] }
 tokio-cron-scheduler = "0.13"
-toml = "0.8"
+dotenvy = "0.15"
 tracing = "0.1"
 tracing-subscriber = "0.3"

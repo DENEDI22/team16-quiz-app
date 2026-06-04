@@ -1,2 +1,0 @@
-[database]
-url = "postgres://postgres:password@localhost:5432/quiz"
