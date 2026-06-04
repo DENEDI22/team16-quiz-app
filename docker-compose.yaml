@@ -10,3 +10,17 @@ services:
     volumes:
       - ./db-data/:/var/lib/postgresql/
 
+  auth:
+    build:
+      context: ./backend/
+      dockerfile: ./crates/auth-service/dockerfile
+    environment:
+      DATABASE_URL: postgres://admin:Start123!@postgres:5432/auth
+      JWT_SECRET: dev-only-secret
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db-quiz-app
+
+volumes:
+  pgdata:
