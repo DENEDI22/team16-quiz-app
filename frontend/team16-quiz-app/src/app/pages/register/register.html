@@ -9,7 +9,6 @@
 
     <mat-card-content>
       <form [formGroup]="registerForm" (ngSubmit)="onSubmit()">
-
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Benutzername</mat-label>
           <input
@@ -20,16 +19,12 @@
 
           @if (registerForm.get('username')?.hasError('required') &&
           registerForm.get('username')?.touched) {
-          <mat-error>
-            Benutzername ist erforderlich
-          </mat-error>
+            <mat-error>Benutzername ist erforderlich</mat-error>
           }
 
           @if (registerForm.get('username')?.hasError('minlength') &&
           registerForm.get('username')?.touched) {
-          <mat-error>
-            Mindestens 3 Zeichen erforderlich
-          </mat-error>
+            <mat-error>Mindestens 3 Zeichen erforderlich</mat-error>
           }
         </mat-form-field>
 
@@ -44,16 +39,12 @@
 
           @if (registerForm.get('email')?.hasError('required') &&
           registerForm.get('email')?.touched) {
-          <mat-error>
-            E-Mail ist erforderlich
-          </mat-error>
+            <mat-error>E-Mail ist erforderlich</mat-error>
           }
 
           @if (registerForm.get('email')?.hasError('email') &&
           registerForm.get('email')?.touched) {
-          <mat-error>
-            Bitte eine gültige E-Mail eingeben
-          </mat-error>
+            <mat-error>Bitte eine gültige E-Mail eingeben</mat-error>
           }
         </mat-form-field>
 
@@ -68,28 +59,36 @@
 
           @if (registerForm.get('password')?.hasError('required') &&
           registerForm.get('password')?.touched) {
-          <mat-error>
-            Passwort ist erforderlich
-          </mat-error>
+            <mat-error>Passwort ist erforderlich</mat-error>
           }
 
           @if (registerForm.get('password')?.hasError('minlength') &&
           registerForm.get('password')?.touched) {
-          <mat-error>
-            Mindestens 6 Zeichen erforderlich
-          </mat-error>
+            <mat-error>Mindestens 6 Zeichen erforderlich</mat-error>
           }
         </mat-form-field>
+
+        @if (errorMessage()) {
+          <p class="error-message">{{ errorMessage() }}</p>
+        }
+
+        @if (successMessage()) {
+          <p class="success-message">{{ successMessage() }}</p>
+        }
 
         <button
           mat-raised-button
           color="primary"
           type="submit"
           class="full-width"
+          [disabled]="isLoading()"
         >
-          Registrieren
+          @if (isLoading()) {
+            Registrierung läuft...
+          } @else {
+            Registrieren
+          }
         </button>
-
       </form>
     </mat-card-content>
   </mat-card>
