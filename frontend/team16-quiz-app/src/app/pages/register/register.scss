@@ -39,3 +39,16 @@ form {
   gap: 1rem;
   margin-top: 1rem;
 }
+.switch-page {
+  text-align: center;
+  margin-top: 1rem;
+}
+
+.switch-page a {
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.switch-page a:hover {
+  text-decoration: underline;
+}

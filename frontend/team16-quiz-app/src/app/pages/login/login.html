@@ -20,16 +20,16 @@
 
           @if (loginForm.get('email')?.hasError('required') &&
           loginForm.get('email')?.touched) {
-          <mat-error>
-            E-Mail ist erforderlich
-          </mat-error>
+            <mat-error>
+              E-Mail ist erforderlich
+            </mat-error>
           }
 
           @if (loginForm.get('email')?.hasError('email') &&
           loginForm.get('email')?.touched) {
-          <mat-error>
-            Bitte eine gültige E-Mail eingeben
-          </mat-error>
+            <mat-error>
+              Bitte eine gültige E-Mail eingeben
+            </mat-error>
           }
         </mat-form-field>
 
@@ -44,16 +44,16 @@
 
           @if (loginForm.get('password')?.hasError('required') &&
           loginForm.get('password')?.touched) {
-          <mat-error>
-            Passwort ist erforderlich
-          </mat-error>
+            <mat-error>
+              Passwort ist erforderlich
+            </mat-error>
           }
 
           @if (loginForm.get('password')?.hasError('minlength') &&
           loginForm.get('password')?.touched) {
-          <mat-error>
-            Mindestens 6 Zeichen erforderlich
-          </mat-error>
+            <mat-error>
+              Mindestens 6 Zeichen erforderlich
+            </mat-error>
           }
         </mat-form-field>
 
@@ -65,7 +65,10 @@
         >
           Einloggen
         </button>
-
+        <p class="switch-page">
+          Noch keinen Account?
+          <a routerLink="/register">Registrieren</a>
+        </p>
       </form>
     </mat-card-content>
   </mat-card>
