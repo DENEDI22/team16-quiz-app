@@ -1,0 +1,96 @@
+name: CI
+
+# Run the test suite on every push to main (and on PRs targeting main),
+# and additionally on version tags. When a `v*` tag is pushed, the tests
+# must pass first and then the service containers are built and pushed
+# to Docker Hub.
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Test backend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend
+
+      - name: Check formatting
+        run: cargo fmt --all --check
+
+      - name: Build workspace
+        run: cargo build --workspace --verbose
+
+      - name: Run tests
+        run: cargo test --workspace --verbose
+
+  docker:
+    name: Build & push containers
+    runs-on: ubuntu-latest
+    # Only publish images for version tags, and only once tests are green.
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        include:
+          - service: auth-service
+            image: quiz-app-auth-service
+          - service: quiz-service
+            image: quiz-app-quiz-service
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        # Enables emulated cross-builds (needed for the arm64 image).
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Derive image tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+
+      - name: Build and push ${{ matrix.service }}
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          file: backend/crates/${{ matrix.service }}/dockerfile
+          # amd64 for normal servers, arm64 for the Raspberry Pi 5.
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
