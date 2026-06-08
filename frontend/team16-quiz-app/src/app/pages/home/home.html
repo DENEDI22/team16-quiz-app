@@ -4,41 +4,43 @@
       <a class="brand" routerLink="/" aria-label="Zur Startseite">
         <img src="/assets/images/quiz-logo-clean.png" alt="Team16 Quiz Logo" />
       </a>
+
       <div class="nav-actions">
-        <a routerLink="/login">Einloggen</a>
-        <a class="nav-button" routerLink="/register">Registrieren</a>
+        @if (authService.isLoggedIn()) {
+          <button class="nav-button logout-button" type="button" (click)="logout()">
+            Logout
+          </button>
+        } @else {
+          <a routerLink="/login">Einloggen</a>
+          <a class="nav-button" routerLink="/register">Registrieren</a>
+        }
       </div>
     </nav>
 
     <div class="hero-content">
-      <p class="eyebrow">Bereit für die naechste Runde?</p>
+      @if (authService.isLoggedIn()) {
+        <p class="eyebrow">Willkommen zurück 👋</p>
+      } @else {
+        <p class="eyebrow">Bereit für die nächste Runde?</p>
+      }
+
       <h1>Team16 Quiz</h1>
+
       <p class="hero-copy">
         Starte spannende Quizrunden, sammle Punkte und zeig deinem Team, wer den schnellsten Kopf hat.
       </p>
 
       <div class="hero-actions">
-        <a class="primary-action" routerLink="/login">Quiz starten</a>
-        <a class="secondary-action" routerLink="/register">Account erstellen</a>
+        @if (authService.isLoggedIn()) {
+          <a class="primary-action" routerLink="/">
+            Quiz starten
+          </a>
+        } @else {
+          <a class="primary-action" routerLink="/login">Quiz starten</a>
+          <a class="secondary-action" routerLink="/register">Account erstellen</a>
+        }
       </div>
     </div>
   </section>
 
-  <section class="quick-start" aria-label="Quiz Vorteile">
-    <div class="quick-item">
-      <span>01</span>
-      <strong>Schneller Einstieg</strong>
-      <p>Einloggen, Runde wählen und direkt loslegen.</p>
-    </div>
-    <div class="quick-item">
-      <span>02</span>
-      <strong>Team Challenge</strong>
-      <p>Punkte sammeln und Ergebnisse vergleichen.</p>
-    </div>
-    <div class="quick-item">
-      <span>03</span>
-      <strong>Quiz Arena</strong>
-      <p>Ein Homescreen, der sich wie der Start einer Show anfuehlt.</p>
-    </div>
-  </section>
 </main>
