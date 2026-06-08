@@ -7,6 +7,11 @@ interface RegisterRequest {
   password: string;
 }
 
+interface LoginRequest {
+  email: string;
+  password: string;
+}
+
 interface AuthResponse {
   success: boolean;
   token?: string;
@@ -20,9 +25,20 @@ interface AuthResponse {
 })
 export class AuthService {
   private http = inject(HttpClient);
+
   private apiUrl = 'http://localhost:3000';
 
   register(data: RegisterRequest) {
-    return this.http.post<AuthResponse>(`${this.apiUrl}/register`, data);
+    return this.http.post<AuthResponse>(
+      `${this.apiUrl}/register`,
+      data
+    );
+  }
+
+  login(data: LoginRequest) {
+    return this.http.post<AuthResponse>(
+      `${this.apiUrl}/login`,
+      data
+    );
   }
 }

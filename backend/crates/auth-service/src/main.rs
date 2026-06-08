@@ -101,7 +101,7 @@ async fn login_handler(
             let token = jwt::get_jwt(user, state.jwt_secret);
 
             match token {
-                Ok(token) => success(&token.to_string()),
+                Ok(token) => token_response(&token.to_string()),
 
                 Err(e) => unauthorized(&e.to_string()),
             }
