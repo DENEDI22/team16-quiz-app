@@ -19,9 +19,7 @@ use sqlx::PgPool;
 use tokio::{self, net::TcpListener};
 use uuid::Uuid;
 
-use crate::db::{
-    get_question_stats, get_user_duels, insert_answer, insert_duel_result, migrate,
-};
+use crate::db::{get_question_stats, get_user_duels, insert_answer, insert_duel_result, migrate};
 use crate::models::{CreateAnswerRequest, CreateDuelResultRequest};
 
 #[derive(clone::Clone)]
