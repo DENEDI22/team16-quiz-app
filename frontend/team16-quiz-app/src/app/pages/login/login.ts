@@ -7,7 +7,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 
-import { AuthService } from '../../auth/services/auth';
+import { AuthService } from '../../services/auth/auth';
 
 @Component({
   selector: 'app-login',
