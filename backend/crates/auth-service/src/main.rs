@@ -15,6 +15,7 @@ use serde_json::json;
 use shared::jwt::{Claims, decode_jwt};
 use sqlx::PgPool;
 use tokio::net::TcpListener;
+use tower_http::cors::{CorsLayer, any};
 
 use crate::db::{get_user, migrate};
 use crate::{
@@ -42,12 +43,15 @@ async fn main() {
         .expect("Database connection failed");
     migrate(&pool).await.expect("Migration failed");
     let state = AppState { pool, jwt_secret };
+    //change permissive to something reasonable and configurable before production deployment.
+    let cors = CorsLayer::permissive();
 
     let app = Router::new()
         .route("/health", get(health))
         .route("/register", post(register_handler))
         .route("/login", post(login_handler))
         .route("/me", get(me_handler))
+        .layer(cors)
         .with_state(state);
 
     // listen globally on port 3000
