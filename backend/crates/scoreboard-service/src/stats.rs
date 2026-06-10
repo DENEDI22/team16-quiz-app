@@ -1,18 +1,7 @@
-//! Pure calculation logic for question statistics.
-//!
-//! This module deliberately contains no database access: it turns the raw
-//! answer aggregates (produced by the queries in `db`) into the `QuestionStats`
-//! response shape, so the arithmetic can be unit tested in isolation.
-
 use uuid::Uuid;
 
 use crate::models::{AnswerOption, QuestionStats, QuestionType};
 
-/// Builds question statistics from raw answer aggregates.
-///
-/// * `total` — total number of recorded answers for the question.
-/// * `counts` — `(answer_id, count)` for each chosen option.
-/// * `correct_answer_id` — the option flagged correct, if any.
 pub fn build_question_stats(
     question_id: Uuid,
     total: i64,
@@ -31,13 +20,13 @@ pub fn build_question_stats(
         question_id: question_id.to_string(),
         total_answers: total.max(0) as u32,
         question_type: question_type(counts.len()),
-        correct_answer_id: correct_answer_id.map(|id| id.to_string()).unwrap_or_default(),
+        correct_answer_id: correct_answer_id
+            .map(|id| id.to_string())
+            .unwrap_or_default(),
         options,
     }
 }
 
-/// Share of `count` within `total`, as a percentage. Guards against division by
-/// zero so an empty question yields `0.0` rather than `NaN`.
 fn percentage(count: i64, total: i64) -> f32 {
     if total <= 0 {
         0.0
@@ -46,7 +35,6 @@ fn percentage(count: i64, total: i64) -> f32 {
     }
 }
 
-/// Two or fewer distinct options is treated as a true/false question.
 fn question_type(distinct_options: usize) -> QuestionType {
     if distinct_options <= 2 {
         QuestionType::TrueFalse
@@ -61,12 +49,7 @@ mod tests {
 
     #[test]
     fn computes_percentages_for_each_option() {
-        let stats = build_question_stats(
-            Uuid::nil(),
-            40,
-            &[(1, 10), (2, 30)],
-            Some(2),
-        );
+        let stats = build_question_stats(Uuid::nil(), 40, &[(1, 10), (2, 30)], Some(2));
 
         assert_eq!(stats.total_answers, 40);
         assert_eq!(stats.options.len(), 2);
@@ -78,12 +61,7 @@ mod tests {
 
     #[test]
     fn percentages_sum_to_one_hundred() {
-        let stats = build_question_stats(
-            Uuid::nil(),
-            8,
-            &[(1, 1), (2, 2), (3, 5)],
-            Some(3),
-        );
+        let stats = build_question_stats(Uuid::nil(), 8, &[(1, 1), (2, 2), (3, 5)], Some(3));
 
         let sum: f32 = stats.options.iter().map(|o| o.percentage).sum();
         assert!((sum - 100.0).abs() < f32::EPSILON, "got {sum}");
@@ -100,8 +78,7 @@ mod tests {
 
     #[test]
     fn three_or_more_options_is_multiple() {
-        let stats =
-            build_question_stats(Uuid::nil(), 6, &[(1, 1), (2, 2), (3, 3)], Some(3));
+        let stats = build_question_stats(Uuid::nil(), 6, &[(1, 1), (2, 2), (3, 3)], Some(3));
 
         assert_eq!(stats.question_type, QuestionType::Multiple);
     }
