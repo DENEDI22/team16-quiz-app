@@ -1,10 +1,8 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::models::{
-    AnswerOption, CreateAnswerRequest, CreateDuelResultRequest, DuelResults, QuestionStats,
-    QuestionType,
-};
+use crate::models::{CreateAnswerRequest, CreateDuelResultRequest, DuelResults, QuestionStats};
+use crate::stats::build_question_stats;
 
 pub async fn migrate(pool: &PgPool) -> Result<(), sqlx::Error> {
     sqlx::query(
@@ -136,27 +134,10 @@ pub async fn get_question_stats(
     .fetch_optional(pool)
     .await?;
 
-    let options = counts
-        .iter()
-        .map(|(answer_id, count)| AnswerOption {
-            answer_id: answer_id.to_string(),
-            percentage: (*count as f32 / total as f32) * 100.0,
-        })
-        .collect::<Vec<_>>();
-
-    let question_type = if counts.len() <= 2 {
-        QuestionType::TrueFalse
-    } else {
-        QuestionType::Multiple
-    };
-
-    Ok(Some(QuestionStats {
-        question_id: question_id.to_string(),
-        total_answers: total as u32,
-        question_type,
-        correct_answer_id: correct_answer_id
-            .map(|id| id.to_string())
-            .unwrap_or_default(),
-        options,
-    }))
+    Ok(Some(build_question_stats(
+        question_id,
+        total,
+        &counts,
+        correct_answer_id,
+    )))
 }

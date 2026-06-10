@@ -72,7 +72,7 @@ pub struct AnswerOption {
     pub percentage: f32,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum QuestionType {
     Multiple,
     TrueFalse,

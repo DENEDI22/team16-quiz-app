@@ -1,5 +1,6 @@
 mod db;
 mod models;
+mod stats;
 
 use std::{clone, env::var};
 
