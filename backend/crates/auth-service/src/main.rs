@@ -31,6 +31,8 @@ struct AppState {
 
 #[tokio::main]
 async fn main() {
+    tracing_subscriber::fmt::init();
+
     dotenv().ok();
     let jwt_secret = var("JWT_SECRET").expect("JWT Secret not set in environment");
     let pool = sqlx::postgres::PgPoolOptions::new()
@@ -52,7 +54,7 @@ async fn main() {
     let listener = TcpListener::bind("0.0.0.0:3000")
         .await
         .expect("Address must be free and valid");
-    println!("Server started successfully at 0.0.0.0:3000");
+    tracing::info!("auth-service listening on 0.0.0.0:3000");
     axum::serve(listener, app)
         .await
         .expect("Error serving application");
@@ -169,6 +171,7 @@ fn unauthorized(msg: &str) -> Response<String> {
 }
 
 fn server_error(msg: &str) -> Response<String> {
+    tracing::error!("internal error: {}", msg);
     Response::builder()
         .status(500)
         .header(header::CONTENT_TYPE, "application/json")

@@ -1,0 +1,14 @@
+FROM rust:1.94 AS builder
+WORKDIR /app
+
+COPY . .
+
+RUN cargo build --release -p scoreboard-service
+
+FROM debian:bookworm-slim
+WORKDIR /app
+
+COPY --from=builder /app/target/release/scoreboard-service /app/scoreboard-service
+
+EXPOSE 3000
+CMD ["./scoreboard-service"]
