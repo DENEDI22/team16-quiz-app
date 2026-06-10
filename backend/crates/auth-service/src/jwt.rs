@@ -45,6 +45,7 @@ pub fn get_jwt(user: User, secret: String) -> Result<String, String> {
     let token = encode(
         &Header::default(),
         &Claims {
+            id: user.id,
             email: user.email,
             role: user_role,
             exp: (Utc::now() + Duration::minutes(10)).timestamp(),

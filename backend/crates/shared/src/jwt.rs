@@ -1,9 +1,12 @@
 use chrono::{DateTime, Utc};
 use jsonwebtoken::{DecodingKey, Validation, decode, errors::ErrorKind};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Claims {
+    /// The authenticated user's id (subject of the token).
+    pub id: Uuid,
     pub email: String,
     pub role: UserRole,
     pub exp: i64,
@@ -42,6 +45,7 @@ mod tests {
         encode(
             &Header::default(),
             &Claims {
+                id: Uuid::nil(),
                 email: email.to_string(),
                 role,
                 exp,
