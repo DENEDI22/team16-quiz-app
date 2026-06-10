@@ -1,6 +1,17 @@
+use serde::Serialize;
 use sqlx::{PgPool, postgres::PgPoolOptions};
 
 use crate::scraper::Question;
+
+#[derive(Debug, sqlx::FromRow, Serialize)]
+pub struct QuestionWithId {
+    pub id: i32,
+    pub category: String,
+    pub difficulty: String,
+    pub question: String,
+    pub correct_answer: String,
+    pub incorrect_answers: Vec<String>,
+}
 
 pub async fn create_pool(url: &str) -> Result<PgPool, sqlx::Error> {
     PgPoolOptions::new().max_connections(5).connect(url).await
@@ -44,9 +55,9 @@ pub async fn insert_questions(pool: &PgPool, questions: &[Question]) -> Result<u
     Ok(inserted)
 }
 
-pub async fn get_random_question(pool: &PgPool) -> Result<Option<Question>, sqlx::Error> {
-    sqlx::query_as::<_, Question>(
-        "SELECT category, difficulty, question, correct_answer, incorrect_answers
+pub async fn get_random_question(pool: &PgPool) -> Result<Option<QuestionWithId>, sqlx::Error> {
+    sqlx::query_as::<_, QuestionWithId>(
+        "SELECT id, category, difficulty, question, correct_answer, incorrect_answers
          FROM questions ORDER BY RANDOM() LIMIT 1",
     )
     .fetch_optional(pool)

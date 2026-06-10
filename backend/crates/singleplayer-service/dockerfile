@@ -1,0 +1,17 @@
+FROM rust:1.94 AS builder
+WORKDIR /app
+
+COPY . .
+
+RUN cargo build --release -p singleplayer-service
+
+# ---- runtime stage ----
+FROM debian:bookworm-slim
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /app/target/release/singleplayer-service /app/singleplayer-service
+
+EXPOSE 3000
+CMD ["./singleplayer-service"]
