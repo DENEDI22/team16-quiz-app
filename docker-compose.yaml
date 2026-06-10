@@ -35,6 +35,17 @@ services:
     depends_on:
       - db-quiz-app
 
+  scoreboard-service:
+    build:
+      context: ./backend/
+      dockerfile: ./crates/scoreboard-service/dockerfile
+    environment:
+      DATABASE_URL: postgres://admin:Start123!@db-quiz-app:5432/scoreboard-service-db
+      JWT_SECRET: dev-only-secret
+    ports:
+      - "5000:3000"
+    depends_on:
+      - db-quiz-app
   singleplayer-service:
     build:
       context: ./backend/
