@@ -1,48 +1,65 @@
 <main class="quiz-page">
   <a class="logo-link" routerLink="/">
-    <img
-      src="/assets/images/quiz-logo-clean.png"
-      alt="Team16 Quiz Logo"
-    />
+    <img src="/assets/images/quiz-logo-clean.png" alt="Team16 Quiz Logo" />
   </a>
 
   @if (gameService.gameOver(); as over) {
-    <section class="quiz-card">
+    <section class="quiz-card game-over-card" @fadeIn>
       <h1>Spiel beendet!</h1>
-      <div class="status-bar">
-        <p>Punkte: {{ over.totalScore }}</p>
-        <p>Richtige Antworten: {{ over.correctAnswers }}</p>
+      <p class="subtitle">Gut gespielt — hier ist dein Ergebnis</p>
+
+      <div class="final-score">
+        <span class="score-number">{{ over.totalScore }}</span>
+        <span class="score-label">Punkte</span>
       </div>
-      <div class="answers">
-        <a class="answer-button" routerLink="/">Zurück zur Startseite</a>
+
+      <div class="stats-row">
+        <div class="stat-item">
+          <strong>{{ over.correctAnswers }}</strong>
+          <span>Richtig</span>
+        </div>
       </div>
+
+      <a class="home-button" routerLink="/">Zurück zur Startseite</a>
     </section>
+
   } @else if (gameService.currentQuestion(); as q) {
-    <section class="quiz-card">
+    <section class="quiz-card"
+      [@questionSlide]="q.questionIndex"
+      [class.result-correct]="answerFeedback() === 'correct'"
+      [class.result-wrong]="answerFeedback() === 'wrong'"
+    >
+
       <div class="quiz-header">
-        <div>
+        <div class="meta-badge">
           <span class="label">Kategorie</span>
           <strong>{{ categoryLabel() }}</strong>
         </div>
-        <div>
+        <div class="meta-badge">
           <span class="label">Schwierigkeit</span>
           <strong>{{ difficultyLabel() }}</strong>
         </div>
-        <div>
+        <div class="meta-badge">
           <span class="label">Frage</span>
           <strong>{{ q.questionIndex }}</strong>
         </div>
       </div>
 
       <div class="status-bar">
-        <p>❤️ {{ gameService.lives() }}</p>
-        <p>Score: {{ gameService.score() }}</p>
+        <div class="lives">
+          @for (i of [1, 2, 3]; track i) {
+            <span class="heart" [class.empty]="i > gameService.lives()">❤️</span>
+          }
+        </div>
+        <div class="score-badge">
+          ⭐ {{ gameService.score() }}
+        </div>
       </div>
 
-      <h1>{{ q.questionText }}</h1>
+      <p class="question-text">{{ q.questionText }}</p>
 
-      <div class="answers">
-        @for (option of q.options; track option.id) {
+      <div class="answers" [@answerStagger]="q.questionIndex">
+        @for (option of q.options; track option.id; let i = $index) {
           <button
             class="answer-button"
             type="button"
@@ -52,14 +69,20 @@
             [class.wrong]="gameService.lastResult() !== null && selectedOptionId() === option.id && !gameService.lastResult()!.correct"
             (click)="selectAnswer(option.id)"
           >
-            {{ option.text }}
+            <span class="answer-letter">{{ 'ABCD'[i] }}</span>
+            <span class="answer-text">{{ option.text }}</span>
           </button>
         }
       </div>
+
     </section>
+
   } @else {
     <section class="quiz-card">
-      <p>Verbinde mit Server...</p>
+      <div class="connecting">
+        <div class="spinner"></div>
+        <p>Verbinde mit Server...</p>
+      </div>
     </section>
   }
 </main>

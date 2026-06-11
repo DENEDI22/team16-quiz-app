@@ -98,15 +98,20 @@ export class GameService {
       case 'game_started':
         this.lives.set(msg.livesRemaining);
         break;
-      case 'question':
-        this.lastResult.set(null);
-        this.currentQuestion.set({
+      case 'question': {
+        const decoded = {
           ...msg,
           questionText: decodeHtml(msg.questionText),
           options: msg.options.map((o) => ({ ...o, text: decodeHtml(o.text) })),
-        });
-        this.questionStartTime = Date.now();
+        };
+        const delay = this.lastResult() !== null ? 800 : 0;
+        this.lastResult.set(null);
+        setTimeout(() => {
+          this.currentQuestion.set(decoded);
+          this.questionStartTime = Date.now();
+        }, delay);
         break;
+      }
       case 'answer_result':
         this.lastResult.set(msg);
         this.lives.set(msg.livesRemaining);
