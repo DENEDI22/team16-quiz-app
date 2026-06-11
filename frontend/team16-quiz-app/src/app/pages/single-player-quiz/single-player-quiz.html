@@ -1,1 +1,42 @@
-<p>single-player-quiz works!</p>
+<main class="quiz-page">
+  <a class="logo-link" routerLink="/">
+    <img
+      src="/assets/images/quiz-logo-clean.png"
+      alt="Team16 Quiz Logo"
+    />
+  </a>
+
+  <section class="quiz-card">
+    <div class="quiz-header">
+      <div>
+        <span class="label">Kategorie</span>
+        <strong>{{ question().category }}</strong>
+      </div>
+
+      <div>
+        <span class="label">Schwierigkeit</span>
+        <strong>{{ question().difficulty }}</strong>
+      </div>
+    </div>
+
+    <div class="status-bar">
+      <p>❤️ {{ lives() }}</p>
+      <p>Score: {{ score() }}</p>
+    </div>
+
+    <h1>{{ question().text }}</h1>
+
+    <div class="answers">
+      @for (answer of question().answers; track answer) {
+        <button
+          class="answer-button"
+          type="button"
+          [class.selected]="selectedAnswer() === answer"
+          (click)="selectAnswer(answer)"
+        >
+          {{ answer }}
+        </button>
+      }
+    </div>
+  </section>
+</main>
