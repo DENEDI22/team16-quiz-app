@@ -1,17 +1,21 @@
 use axum::extract::ws::{Message, WebSocket};
 use chrono::Utc;
+use reqwest::header::AUTHORIZATION;
+use shared::jwt::decode_jwt;
 use uuid::Uuid;
 
 use crate::AppState;
 use crate::models::{
-    AnswerOption, ClientMsg, PostAnswerPayload, PreparedQuestion, QuizServiceResponse, ServerMsg,
+    AnswerOption, ClientMsg, PostAnswerPayload, PreparedQuestion, QuizQuestion,
+    QuizServiceResponse, ServerMsg,
 };
 
 pub async fn handle_socket(mut socket: WebSocket, state: AppState) {
-    let (user_id, session_id) = match wait_for_start(&mut socket).await {
-        Some(v) => v,
+    let mut token = match wait_for_start(&mut socket, &state).await {
+        Some(t) => t,
         None => return,
     };
+    let session_id = Uuid::new_v4();
 
     const MAX_LIVES: u8 = 3;
     let mut lives: u8 = MAX_LIVES;
@@ -19,7 +23,7 @@ pub async fn handle_socket(mut socket: WebSocket, state: AppState) {
     if send_msg(
         &mut socket,
         &ServerMsg::GameStarted {
-            session_id: session_id.clone(),
+            session_id,
             lives_remaining: lives,
         },
     )
@@ -34,7 +38,7 @@ pub async fn handle_socket(mut socket: WebSocket, state: AppState) {
     let mut question_index: usize = 0;
 
     loop {
-        let question = match fetch_question(&state).await {
+        let question = match fetch_question(&state, &token).await {
             Ok(q) => q,
             Err(e) => {
                 send_error(&mut socket, &e).await;
@@ -47,7 +51,7 @@ pub async fn handle_socket(mut socket: WebSocket, state: AppState) {
         if send_msg(
             &mut socket,
             &ServerMsg::Question {
-                question_id: question.question_id.clone(),
+                question_id: question.question_id,
                 question_text: question.question_text.clone(),
                 options: question.options.clone(),
                 question_index,
@@ -59,10 +63,19 @@ pub async fn handle_socket(mut socket: WebSocket, state: AppState) {
             return;
         }
 
-        let (submitted_id, answer_id, time_to_answer) = match wait_for_answer(&mut socket).await {
-            Some(v) => v,
-            None => return,
-        };
+        let (submitted_id, answer_id, time_to_answer_seconds, submitted_token) =
+            match wait_for_answer(&mut socket).await {
+                Some(v) => v,
+                None => return,
+            };
+
+        // Keep forwarding the freshest valid token the client has sent (§2.4).
+        if submitted_token != token {
+            match decode_jwt(&submitted_token, &state.jwt_secret) {
+                Ok(_) => token = submitted_token,
+                Err(e) => tracing::warn!("ignoring invalid refreshed token: {e}"),
+            }
+        }
 
         if submitted_id != question.question_id {
             send_error(&mut socket, "unexpected questionId in submit_answer").await;
@@ -73,12 +86,12 @@ pub async fn handle_socket(mut socket: WebSocket, state: AppState) {
 
         post_answer_to_scoreboard(
             state.clone(),
-            user_id.clone(),
-            session_id.clone(),
-            question.question_id.clone(),
-            answer_id.clone(),
+            token.clone(),
+            session_id,
+            question.question_id,
+            answer_id,
             correct,
-            time_to_answer,
+            time_to_answer_seconds,
         );
 
         if correct {
@@ -92,7 +105,7 @@ pub async fn handle_socket(mut socket: WebSocket, state: AppState) {
             &mut socket,
             &ServerMsg::AnswerResult {
                 correct,
-                correct_answer_id: question.correct_answer_id.clone(),
+                correct_answer_id: question.correct_answer_id,
                 total_score,
                 lives_remaining: lives,
             },
@@ -116,13 +129,19 @@ pub async fn handle_socket(mut socket: WebSocket, state: AppState) {
     }
 }
 
-async fn wait_for_start(socket: &mut WebSocket) -> Option<(String, String)> {
+/// Waits for `start_game`, validates its token, and returns the token.
+async fn wait_for_start(socket: &mut WebSocket, state: &AppState) -> Option<String> {
     while let Some(Ok(msg)) = socket.recv().await {
         if let Message::Text(text) = msg {
             match serde_json::from_str::<ClientMsg>(&text) {
-                Ok(ClientMsg::StartGame { user_id }) => {
-                    let session_id = format!("sess_{}", &Uuid::new_v4().to_string()[..8]);
-                    return Some((user_id, session_id));
+                Ok(ClientMsg::StartGame { token }) => {
+                    match decode_jwt(&token, &state.jwt_secret) {
+                        Ok(_claims) => return Some(token),
+                        Err(e) => {
+                            send_error(socket, &format!("invalid token: {e}")).await;
+                            return None;
+                        }
+                    }
                 }
                 _ => {
                     send_error(socket, "expected start_game message").await;
@@ -134,15 +153,16 @@ async fn wait_for_start(socket: &mut WebSocket) -> Option<(String, String)> {
     None
 }
 
-async fn wait_for_answer(socket: &mut WebSocket) -> Option<(String, String, u64)> {
+async fn wait_for_answer(socket: &mut WebSocket) -> Option<(Uuid, i32, i32, String)> {
     while let Some(Ok(msg)) = socket.recv().await {
         if let Message::Text(text) = msg {
             match serde_json::from_str::<ClientMsg>(&text) {
                 Ok(ClientMsg::SubmitAnswer {
+                    token,
                     question_id,
                     answer_id,
-                    time_to_answer,
-                }) => return Some((question_id, answer_id, time_to_answer)),
+                    time_to_answer_seconds,
+                }) => return Some((question_id, answer_id, time_to_answer_seconds, token)),
                 _ => {
                     send_error(socket, "expected submit_answer message").await;
                     return None;
@@ -153,16 +173,20 @@ async fn wait_for_answer(socket: &mut WebSocket) -> Option<(String, String, u64)
     None
 }
 
-async fn fetch_question(state: &AppState) -> Result<PreparedQuestion, String> {
+async fn fetch_question(state: &AppState, token: &str) -> Result<PreparedQuestion, String> {
     let resp = state
         .http_client
         .get(format!("{}/questions", state.quiz_service_url))
+        .header(AUTHORIZATION, format!("Bearer {token}"))
         .send()
         .await
         .map_err(|e| format!("quiz-service unreachable: {e}"))?;
 
     if !resp.status().is_success() {
-        return Err("quiz-service returned no question".into());
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        tracing::warn!("quiz-service returned {status}: {body}");
+        return Err(format!("quiz-service returned {status}"));
     }
 
     let body: QuizServiceResponse = resp
@@ -173,39 +197,30 @@ async fn fetch_question(state: &AppState) -> Result<PreparedQuestion, String> {
     Ok(prepare_question(body.data))
 }
 
-fn prepare_question(q: crate::models::QuizQuestion) -> PreparedQuestion {
-    let mut all_options: Vec<String> = q.incorrect_answers.clone();
+/// Builds the canonical option list (docs/api-contracts.md §1.2): all option
+/// texts sorted lexicographically, identified by their 1-based index.
+fn prepare_question(q: QuizQuestion) -> PreparedQuestion {
+    let mut all_options = q.incorrect_answers;
     all_options.push(q.correct_answer.clone());
     all_options.sort();
 
-    let options: Vec<AnswerOption> = all_options
+    let correct_answer_id = all_options
         .iter()
+        .position(|text| *text == q.correct_answer)
+        .map(|i| (i + 1) as i32)
+        .expect("correct answer is always one of the options");
+
+    let options = all_options
+        .into_iter()
         .enumerate()
         .map(|(i, text)| AnswerOption {
-            id: format!("a_{}", i + 1),
-            text: text.clone(),
+            id: (i + 1) as i32,
+            text,
         })
         .collect();
 
-    let correct_answer_id = options
-        .iter()
-        .find(|o| o.text == q.correct_answer)
-        .map(|o| o.id.clone())
-        .unwrap_or_else(|| "a_1".to_string());
-
-    let question_id = match q.id {
-        Some(id) => format!("q_{}", id),
-        None => {
-            let hash = q
-                .question
-                .bytes()
-                .fold(0u32, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u32));
-            format!("q_{}", hash)
-        }
-    };
-
     PreparedQuestion {
-        question_id,
+        question_id: q.question_id,
         question_text: q.question,
         options,
         correct_answer_id,
@@ -214,32 +229,38 @@ fn prepare_question(q: crate::models::QuizQuestion) -> PreparedQuestion {
 
 fn post_answer_to_scoreboard(
     state: AppState,
-    user_id: String,
-    session_id: String,
-    question_id: String,
-    answer_id: String,
+    token: String,
+    session_id: Uuid,
+    question_id: Uuid,
+    answer_id: i32,
     is_correct: bool,
-    time_to_answer: u64,
+    time_to_answer_seconds: i32,
 ) {
     tokio::spawn(async move {
         let payload = PostAnswerPayload {
             question_id,
-            user_id,
             answer_id,
             is_correct,
             timestamp: Utc::now().to_rfc3339(),
-            time_to_answer,
+            time_to_answer_seconds,
             is_multiplayer: false,
             session_id,
         };
         let result = state
             .http_client
             .post(format!("{}/post-answer", state.scoreboard_service_url))
+            .header(AUTHORIZATION, format!("Bearer {token}"))
             .json(&payload)
             .send()
             .await;
-        if let Err(e) = result {
-            tracing::warn!("failed to post answer to scoreboard: {e}");
+        match result {
+            Ok(resp) if !resp.status().is_success() => {
+                let status = resp.status();
+                let body = resp.text().await.unwrap_or_default();
+                tracing::warn!("scoreboard rejected answer: {status}: {body}");
+            }
+            Ok(_) => {}
+            Err(e) => tracing::warn!("failed to post answer to scoreboard: {e}"),
         }
     });
 }
@@ -263,4 +284,57 @@ async fn send_error(socket: &mut WebSocket, message: &str) {
     )
     .await
     .ok();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_question() -> QuizQuestion {
+        QuizQuestion {
+            question_id: Uuid::nil(),
+            question: "What does CPU stand for?".to_string(),
+            correct_answer: "Central Processing Unit".to_string(),
+            incorrect_answers: vec![
+                "Central Process Unit".to_string(),
+                "Computer Personal Unit".to_string(),
+                "Central Processor Unit".to_string(),
+            ],
+        }
+    }
+
+    #[test]
+    fn options_are_sorted_with_one_based_ids() {
+        let prepared = prepare_question(sample_question());
+
+        let texts: Vec<&str> = prepared.options.iter().map(|o| o.text.as_str()).collect();
+        let mut sorted = texts.clone();
+        sorted.sort();
+        assert_eq!(texts, sorted, "options must be in canonical sorted order");
+        assert_eq!(
+            prepared.options.iter().map(|o| o.id).collect::<Vec<_>>(),
+            vec![1, 2, 3, 4]
+        );
+    }
+
+    #[test]
+    fn correct_answer_id_points_at_the_correct_option() {
+        let prepared = prepare_question(sample_question());
+
+        let correct = prepared
+            .options
+            .iter()
+            .find(|o| o.id == prepared.correct_answer_id)
+            .expect("correct option exists");
+        assert_eq!(correct.text, "Central Processing Unit");
+    }
+
+    #[test]
+    fn question_id_is_passed_through() {
+        let id = Uuid::from_u128(42);
+        let mut q = sample_question();
+        q.question_id = id;
+
+        assert_eq!(prepare_question(q).question_id, id);
+    }
 }

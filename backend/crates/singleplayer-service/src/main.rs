@@ -16,6 +16,7 @@ pub struct AppState {
     pub http_client: reqwest::Client,
     pub quiz_service_url: String,
     pub scoreboard_service_url: String,
+    pub jwt_secret: String,
 }
 
 #[tokio::main]
@@ -27,11 +28,13 @@ async fn main() {
     let scoreboard_service_url =
         std::env::var("SCOREBOARD_SERVICE_URL").expect("SCOREBOARD_SERVICE_URL must be set");
     let address = std::env::var("ADDRESS").expect("ADDRESS must be set");
+    let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
 
     let state = AppState {
         http_client: reqwest::Client::new(),
         quiz_service_url,
         scoreboard_service_url,
+        jwt_secret,
     };
 
     let app = Router::new()

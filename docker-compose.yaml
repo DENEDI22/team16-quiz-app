@@ -30,6 +30,7 @@ services:
       DATABASE_URL: postgres://admin:Start123!@db-quiz-app:5432/quiz-service
       CRON_JOB: "0 0 * * * *"
       ADDRESS: "0.0.0.0:3000"
+      JWT_SECRET: dev-only-secret
     ports:
       - "4000:3000"
     depends_on:
@@ -46,16 +47,18 @@ services:
       - "5000:3000"
     depends_on:
       - db-quiz-app
+
   singleplayer-service:
     build:
       context: ./backend/
       dockerfile: ./crates/singleplayer-service/dockerfile
     environment:
       ADDRESS: "0.0.0.0:3000"
+      JWT_SECRET: dev-only-secret
       QUIZ_SERVICE_URL: "http://quiz-service:3000"
       SCOREBOARD_SERVICE_URL: "http://scoreboard-service:3000"
     ports:
-      - "5000:3000"
+      - "6000:3000"
     depends_on:
       - quiz-service
 

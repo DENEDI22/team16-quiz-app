@@ -12,7 +12,8 @@ pub struct Answer {
     pub answer_id: i32,
     pub is_correct: bool,
     pub timestamp: DateTime<Utc>,
-    pub time_to_answer: i32,
+    #[sqlx(rename = "time_to_answer")]
+    pub time_to_answer_seconds: i32,
     pub is_multiplayer: bool,
     pub session_id: Uuid,
 }
@@ -36,10 +37,11 @@ pub struct CreateAnswerRequest {
     pub question_id: Uuid,
     // `user_id` is intentionally omitted: it is taken from the authenticated
     // JWT (claims.id), not trusted from the request body.
+    /// 1-based option index (docs/api-contracts.md §1.2).
     pub answer_id: i32,
     pub is_correct: bool,
     pub timestamp: DateTime<Utc>,
-    pub time_to_answer: i32,
+    pub time_to_answer_seconds: i32,
     pub is_multiplayer: bool,
     pub session_id: Uuid,
 }
@@ -58,17 +60,19 @@ pub struct CreateDuelResultRequest {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct QuestionStats {
-    pub question_id: String,
+    pub question_id: Uuid,
     pub total_answers: u32,
     pub question_type: QuestionType,
-    pub correct_answer_id: String,
+    /// 1-based option index; 0 when no correct answer was recorded.
+    pub correct_answer_id: i32,
     pub options: Vec<AnswerOption>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AnswerOption {
-    pub answer_id: String,
+    /// 1-based option index (docs/api-contracts.md §1.2).
+    pub answer_id: i32,
     pub percentage: f32,
 }
 

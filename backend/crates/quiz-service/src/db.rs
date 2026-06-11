@@ -1,11 +1,14 @@
 use serde::Serialize;
 use sqlx::{PgPool, postgres::PgPoolOptions};
+use uuid::Uuid;
 
 use crate::scraper::Question;
 
 #[derive(Debug, sqlx::FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct QuestionWithId {
-    pub id: i32,
+    #[serde(rename = "questionId")]
+    pub id: Uuid,
     pub category: String,
     pub difficulty: String,
     pub question: String,
@@ -20,7 +23,7 @@ pub async fn create_pool(url: &str) -> Result<PgPool, sqlx::Error> {
 pub async fn create_table(pool: &PgPool) -> Result<(), sqlx::Error> {
     sqlx::query(
         "CREATE TABLE IF NOT EXISTS questions (
-            id              SERIAL PRIMARY KEY,
+            id              uuid DEFAULT gen_random_uuid() PRIMARY KEY,
             category        TEXT NOT NULL,
             difficulty      TEXT NOT NULL,
             question        TEXT NOT NULL UNIQUE,

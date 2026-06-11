@@ -11,18 +11,16 @@ pub fn build_question_stats(
     let options = counts
         .iter()
         .map(|(answer_id, count)| AnswerOption {
-            answer_id: answer_id.to_string(),
+            answer_id: *answer_id,
             percentage: percentage(*count, total),
         })
         .collect();
 
     QuestionStats {
-        question_id: question_id.to_string(),
+        question_id,
         total_answers: total.max(0) as u32,
         question_type: question_type(counts.len()),
-        correct_answer_id: correct_answer_id
-            .map(|id| id.to_string())
-            .unwrap_or_default(),
+        correct_answer_id: correct_answer_id.unwrap_or(0),
         options,
     }
 }
@@ -53,9 +51,9 @@ mod tests {
 
         assert_eq!(stats.total_answers, 40);
         assert_eq!(stats.options.len(), 2);
-        assert_eq!(stats.options[0].answer_id, "1");
+        assert_eq!(stats.options[0].answer_id, 1);
         assert_eq!(stats.options[0].percentage, 25.0);
-        assert_eq!(stats.options[1].answer_id, "2");
+        assert_eq!(stats.options[1].answer_id, 2);
         assert_eq!(stats.options[1].percentage, 75.0);
     }
 
@@ -84,15 +82,15 @@ mod tests {
     }
 
     #[test]
-    fn correct_answer_id_is_stringified() {
+    fn correct_answer_id_is_passed_through_as_integer() {
         let stats = build_question_stats(Uuid::nil(), 3, &[(7, 3)], Some(7));
-        assert_eq!(stats.correct_answer_id, "7");
+        assert_eq!(stats.correct_answer_id, 7);
     }
 
     #[test]
-    fn missing_correct_answer_yields_empty_string() {
+    fn missing_correct_answer_yields_zero() {
         let stats = build_question_stats(Uuid::nil(), 3, &[(1, 3)], None);
-        assert_eq!(stats.correct_answer_id, "");
+        assert_eq!(stats.correct_answer_id, 0);
     }
 
     #[test]
@@ -105,10 +103,22 @@ mod tests {
     }
 
     #[test]
-    fn question_id_is_stringified() {
+    fn question_id_is_passed_through() {
         let id = Uuid::from_u128(0x0123_4567_89ab_cdef_0123_4567_89ab_cdef);
         let stats = build_question_stats(id, 1, &[(1, 1)], Some(1));
 
-        assert_eq!(stats.question_id, id.to_string());
+        assert_eq!(stats.question_id, id);
+    }
+
+    #[test]
+    fn serializes_to_the_documented_camel_case_shape() {
+        let stats = build_question_stats(Uuid::nil(), 40, &[(1, 10), (2, 30)], Some(2));
+
+        let json = serde_json::to_value(&stats).unwrap();
+        assert_eq!(json["questionId"], Uuid::nil().to_string());
+        assert_eq!(json["totalAnswers"], 40);
+        assert_eq!(json["questionType"], "TrueFalse");
+        assert_eq!(json["correctAnswerId"], 2);
+        assert_eq!(json["options"][0]["answerId"], 1);
     }
 }

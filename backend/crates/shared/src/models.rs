@@ -1,9 +1,0 @@
-use serde::{Deserialze, Serialize};
-
-#[derive(Debug, Serialize, Clone)]
-pub struct User {
-    pub user_id: usize,
-    pub username: String,
-    pub password: String,
-    pub role: String
-}
