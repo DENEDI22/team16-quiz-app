@@ -1,1 +1,69 @@
-<p>quiz-setup works!</p>
+<main class="setup-page">
+
+  <a class="logo-link" routerLink="/">
+    <img
+      src="/assets/images/quiz-logo-clean.png"
+      alt="Team16 Quiz Logo"
+    />
+  </a>
+
+  <section class="setup-card">
+
+    <h1>Quiz vorbereiten</h1>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Kategorie</mat-label>
+
+      <mat-select [(ngModel)]="category">
+
+        <mat-option value="sports">
+          Sport
+        </mat-option>
+
+        <mat-option value="history">
+          Geschichte
+        </mat-option>
+
+        <mat-option value="music">
+          Musik
+        </mat-option>
+
+        <mat-option value="computer">
+          Computer
+        </mat-option>
+
+      </mat-select>
+
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Schwierigkeit</mat-label>
+
+      <mat-select [(ngModel)]="difficulty">
+
+        <mat-option value="easy">
+          Einfach
+        </mat-option>
+
+        <mat-option value="medium">
+          Mittel
+        </mat-option>
+
+        <mat-option value="hard">
+          Schwer
+        </mat-option>
+
+      </mat-select>
+
+    </mat-form-field>
+
+    <a
+      class="start-button"
+      routerLink="/single-player"
+    >
+      Quiz starten
+    </a>
+
+  </section>
+
+</main>

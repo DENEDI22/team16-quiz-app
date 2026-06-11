@@ -1,0 +1,82 @@
+.setup-page {
+  min-height: 100vh;
+  background: #060b2d;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  position: relative;
+}
+
+.logo-link {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+
+  width: 140px;
+}
+
+.logo-link img {
+  width: 100%;
+}
+
+.setup-card {
+  width: 100%;
+  max-width: 500px;
+
+  padding: 2rem;
+
+  background: rgba(255,255,255,0.08);
+
+  border: 1px solid rgba(255,255,255,0.15);
+
+  border-radius: 16px;
+
+  backdrop-filter: blur(12px);
+
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+h1 {
+  color: white;
+  text-align: center;
+}
+
+.start-button {
+  margin-top: 1rem;
+
+  text-decoration: none;
+
+  background: #ffce63;
+  color: #07113e;
+
+  padding: 1rem;
+
+  border-radius: 8px;
+
+  font-weight: 700;
+
+  text-align: center;
+}
+mat-form-field {
+  width: 100%;
+}
+::ng-deep .mat-mdc-text-field-wrapper {
+  background-color: rgba(255,255,255,0.05) !important;
+}
+
+::ng-deep .mdc-floating-label {
+  color: rgba(255,255,255,0.8) !important;
+}
+
+::ng-deep .mat-mdc-select-value {
+  color: white !important;
+}
+
+::ng-deep .mat-mdc-select-arrow {
+  color: white !important;
+}
+
