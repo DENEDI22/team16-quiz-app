@@ -1,14 +1,14 @@
-use std::env::var;
-
 use argon2::{
     Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
     password_hash::{SaltString, rand_core::OsRng},
 };
 use chrono::{Duration, Utc};
-use jsonwebtoken::{EncodingKey, Header, encode};
 use serde::{Deserialize, Serialize};
-use shared::jwt::{Claims, UserRole};
+use shared::jwt::{Claims, UserRole, encode_jwt};
 use sqlx::prelude::FromRow;
+
+/// Access-token lifetime (docs/api-contracts.md §2.2).
+pub const TOKEN_TTL_MINUTES: i64 = 15;
 
 #[derive(FromRow, Deserialize, Serialize)]
 pub struct User {
@@ -42,19 +42,15 @@ pub fn get_jwt(user: User, secret: String) -> Result<String, String> {
     } else {
         UserRole::User
     };
-    let token = encode(
-        &Header::default(),
+    encode_jwt(
         &Claims {
             id: user.id,
             email: user.email,
             role: user_role,
-            exp: (Utc::now() + Duration::minutes(10)).timestamp(),
+            exp: (Utc::now() + Duration::minutes(TOKEN_TTL_MINUTES)).timestamp(),
         },
-        &EncodingKey::from_secret(secret.as_bytes()),
+        &secret,
     )
-    .map_err(|e| e.to_string());
-
-    token
 }
 
 #[cfg(test)]
@@ -105,7 +101,7 @@ mod tests {
         let token =
             get_jwt(sample_user(true), secret.clone()).expect("jwt issuance should succeed");
 
-        let claims = decode_jwt(&token, secret).expect("issued token should decode");
+        let claims = decode_jwt(&token, &secret).expect("issued token should decode");
         assert_eq!(claims.email, "user@example.com");
         assert!(matches!(claims.role, UserRole::Admin));
         assert!(claims.exp > 0);
@@ -116,7 +112,7 @@ mod tests {
         let secret = "issuer-secret".to_string();
         let token = get_jwt(sample_user(false), secret.clone()).unwrap();
 
-        let claims = decode_jwt(&token, secret).unwrap();
+        let claims = decode_jwt(&token, &secret).unwrap();
         assert!(matches!(claims.role, UserRole::User));
     }
 }

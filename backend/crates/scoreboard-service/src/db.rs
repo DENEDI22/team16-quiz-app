@@ -62,7 +62,7 @@ pub async fn insert_answer(
     .bind(req.answer_id)
     .bind(req.is_correct)
     .bind(req.timestamp)
-    .bind(req.time_to_answer)
+    .bind(req.time_to_answer_seconds)
     .bind(req.is_multiplayer)
     .bind(req.session_id)
     .fetch_one(pool)

@@ -1,19 +1,25 @@
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ClientMsg {
+    /// Carries the user's access token; the user identity comes from its
+    /// claims, never from a client-supplied id (docs/api-contracts.md §2.4).
     StartGame {
-        #[serde(rename = "userId")]
-        user_id: String,
+        token: String,
     },
     SubmitAnswer {
+        /// The client's *current* access token, refreshed as needed; the
+        /// freshest valid one is forwarded to scoreboard-service.
+        token: String,
         #[serde(rename = "questionId")]
-        question_id: String,
+        question_id: Uuid,
+        /// 1-based option index (docs/api-contracts.md §1.2).
         #[serde(rename = "answerId")]
-        answer_id: String,
-        #[serde(rename = "timeToAnswer")]
-        time_to_answer: u64,
+        answer_id: i32,
+        #[serde(rename = "timeToAnswerSeconds")]
+        time_to_answer_seconds: i32,
     },
 }
 
@@ -22,13 +28,13 @@ pub enum ClientMsg {
 pub enum ServerMsg {
     GameStarted {
         #[serde(rename = "sessionId")]
-        session_id: String,
+        session_id: Uuid,
         #[serde(rename = "livesRemaining")]
         lives_remaining: u8,
     },
     Question {
         #[serde(rename = "questionId")]
-        question_id: String,
+        question_id: Uuid,
         #[serde(rename = "questionText")]
         question_text: String,
         options: Vec<AnswerOption>,
@@ -38,7 +44,7 @@ pub enum ServerMsg {
     AnswerResult {
         correct: bool,
         #[serde(rename = "correctAnswerId")]
-        correct_answer_id: String,
+        correct_answer_id: i32,
         #[serde(rename = "totalScore")]
         total_score: i32,
         #[serde(rename = "livesRemaining")]
@@ -57,46 +63,44 @@ pub enum ServerMsg {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct AnswerOption {
-    pub id: String,
+    /// 1-based option index (docs/api-contracts.md §1.2).
+    pub id: i32,
     pub text: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct PreparedQuestion {
-    pub question_id: String,
+    pub question_id: Uuid,
     pub question_text: String,
     pub options: Vec<AnswerOption>,
-    pub correct_answer_id: String,
+    pub correct_answer_id: i32,
 }
 
+/// quiz-service's `{ "success": true, "data": … }` envelope around a question.
 #[derive(Debug, Deserialize)]
 pub struct QuizServiceResponse {
     pub data: QuizQuestion,
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct QuizQuestion {
-    pub id: Option<i32>,
+    pub question_id: Uuid,
     pub question: String,
     pub correct_answer: String,
     pub incorrect_answers: Vec<String>,
 }
 
+/// Body for scoreboard-service's `POST /post-answer`. The user is identified by
+/// the forwarded bearer token, so no user id appears here.
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PostAnswerPayload {
-    #[serde(rename = "questionId")]
-    pub question_id: String,
-    #[serde(rename = "userId")]
-    pub user_id: String,
-    #[serde(rename = "answerId")]
-    pub answer_id: String,
-    #[serde(rename = "isCorrect")]
+    pub question_id: Uuid,
+    pub answer_id: i32,
     pub is_correct: bool,
     pub timestamp: String,
-    #[serde(rename = "timeToAnswer")]
-    pub time_to_answer: u64,
-    #[serde(rename = "isMultiplayer")]
+    pub time_to_answer_seconds: i32,
     pub is_multiplayer: bool,
-    #[serde(rename = "sessionId")]
-    pub session_id: String,
+    pub session_id: Uuid,
 }

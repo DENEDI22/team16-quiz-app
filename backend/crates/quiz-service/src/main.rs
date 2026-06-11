@@ -3,12 +3,14 @@ mod scraper;
 
 use axum::{
     Json, Router,
-    extract::State,
-    http::StatusCode,
+    extract::{FromRef, State},
+    http::{Response, StatusCode},
     response::IntoResponse,
     routing::{get, post},
 };
 use serde_json::json;
+use shared::auth::{AdminAuth, Auth, JwtSecret};
+use shared::respond;
 use sqlx::PgPool;
 use tokio::net::TcpListener;
 use tokio_cron_scheduler::{Job, JobScheduler};
@@ -16,6 +18,13 @@ use tokio_cron_scheduler::{Job, JobScheduler};
 #[derive(Clone)]
 struct AppState {
     pool: PgPool,
+    jwt_secret: String,
+}
+
+impl FromRef<AppState> for JwtSecret {
+    fn from_ref(state: &AppState) -> Self {
+        JwtSecret(state.jwt_secret.clone())
+    }
 }
 
 #[tokio::main]
@@ -25,6 +34,7 @@ async fn main() {
     // DATABASE_URL=postgres://(user)):(password)!@(address))/(db)
     dotenvy::dotenv().ok();
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
 
     let pool = db::create_pool(&database_url)
         .await
@@ -40,7 +50,7 @@ async fn main() {
         .route("/health", get(health))
         .route("/questions", get(get_question))
         .route("/scrape", post(manual_scrape))
-        .with_state(AppState { pool });
+        .with_state(AppState { pool, jwt_secret });
 
     // 0.0.0.0:(port)
     let address = std::env::var("ADDRESS").expect("ADDRESS must be set");
@@ -84,29 +94,23 @@ async fn run_scrape(pool: &PgPool) {
     }
 }
 
-async fn get_question(State(state): State<AppState>) -> impl IntoResponse {
+async fn get_question(Auth(_claims): Auth, State(state): State<AppState>) -> Response<String> {
     match db::get_random_question(&state.pool).await {
-        Ok(Some(q)) => (StatusCode::OK, Json(json!({ "success": true, "data": q }))),
-        Ok(None) => (
-            StatusCode::NOT_FOUND,
-            Json(json!({ "success": false, "message": "No questions in database yet" })),
-        ),
+        Ok(Some(q)) => respond::ok(json!(q)),
+        Ok(None) => respond::error(StatusCode::NOT_FOUND, "No questions in database yet"),
         Err(e) => {
             tracing::error!("DB error: {}", e);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({ "success": false, "message": "Database error" })),
-            )
+            respond::error(StatusCode::INTERNAL_SERVER_ERROR, "Database error")
         }
     }
 }
 
-async fn manual_scrape(State(state): State<AppState>) -> impl IntoResponse {
+async fn manual_scrape(
+    AdminAuth(_claims): AdminAuth,
+    State(state): State<AppState>,
+) -> Response<String> {
     run_scrape(&state.pool).await;
-    (
-        StatusCode::OK,
-        Json(json!({ "success": true, "message": "Scrape triggered" })),
-    )
+    respond::ok(json!({ "message": "Scrape triggered" }))
 }
 
 async fn health() -> impl IntoResponse {
