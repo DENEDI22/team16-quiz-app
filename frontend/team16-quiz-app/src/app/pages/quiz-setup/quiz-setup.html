@@ -16,20 +16,11 @@
 
       <mat-select [(ngModel)]="categories" multiple>
 
-        <mat-option
-          value="All"
-          (click)="toggleAllCategories()"
-        >
-          Alle
-        </mat-option>
+        <mat-option value="All" (click)="toggleAllCategories()">Alle</mat-option>
 
-        <mat-option value="Sports">Sport</mat-option>
-        <mat-option value="History">Geschichte</mat-option>
-        <mat-option value="Geography">Geografie</mat-option>
-        <mat-option value="Entertainment: Music">Musik</mat-option>
-        <mat-option value="Science: Computers">Computer</mat-option>
-        <mat-option value="Entertainment: Video Games">Videospiele</mat-option>
-        <mat-option value="General Knowledge">Allgemeinwissen</mat-option>
+        @for (cat of categoryOptions; track cat.value) {
+          <mat-option [value]="cat.value">{{ cat.label }}</mat-option>
+        }
 
       </mat-select>
     </mat-form-field>
@@ -39,20 +30,11 @@
 
       <mat-select [(ngModel)]="difficulty">
 
-        <mat-option value="easy">
-          Einfach
-        </mat-option>
-
-        <mat-option value="medium">
-          Mittel
-        </mat-option>
-
-        <mat-option value="hard">
-          Schwer
-        </mat-option>
+        @for (diff of difficultyOptions; track diff.value) {
+          <mat-option [value]="diff.value">{{ diff.label }}</mat-option>
+        }
 
       </mat-select>
-
     </mat-form-field>
 
     <button

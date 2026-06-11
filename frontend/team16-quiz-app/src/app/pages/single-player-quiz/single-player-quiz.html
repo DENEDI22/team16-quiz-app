@@ -6,37 +6,60 @@
     />
   </a>
 
-  <section class="quiz-card">
-    <div class="quiz-header">
-      <div>
-        <span class="label">Kategorie</span>
-        <strong>{{ question().category }}</strong>
+  @if (gameService.gameOver(); as over) {
+    <section class="quiz-card">
+      <h1>Spiel beendet!</h1>
+      <div class="status-bar">
+        <p>Punkte: {{ over.totalScore }}</p>
+        <p>Richtige Antworten: {{ over.correctAnswers }}</p>
+      </div>
+      <div class="answers">
+        <a class="answer-button" routerLink="/">Zurück zur Startseite</a>
+      </div>
+    </section>
+  } @else if (gameService.currentQuestion(); as q) {
+    <section class="quiz-card">
+      <div class="quiz-header">
+        <div>
+          <span class="label">Kategorie</span>
+          <strong>{{ categoryLabel() }}</strong>
+        </div>
+        <div>
+          <span class="label">Schwierigkeit</span>
+          <strong>{{ difficultyLabel() }}</strong>
+        </div>
+        <div>
+          <span class="label">Frage</span>
+          <strong>{{ q.questionIndex }}</strong>
+        </div>
       </div>
 
-      <div>
-        <span class="label">Schwierigkeit</span>
-        <strong>{{ question().difficulty }}</strong>
+      <div class="status-bar">
+        <p>❤️ {{ gameService.lives() }}</p>
+        <p>Score: {{ gameService.score() }}</p>
       </div>
-    </div>
 
-    <div class="status-bar">
-      <p>❤️ {{ lives() }}</p>
-      <p>Score: {{ score() }}</p>
-    </div>
+      <h1>{{ q.questionText }}</h1>
 
-    <h1>{{ question().text }}</h1>
-
-    <div class="answers">
-      @for (answer of question().answers; track answer) {
-        <button
-          class="answer-button"
-          type="button"
-          [class.selected]="selectedAnswer() === answer"
-          (click)="selectAnswer(answer)"
-        >
-          {{ answer }}
-        </button>
-      }
-    </div>
-  </section>
+      <div class="answers">
+        @for (option of q.options; track option.id) {
+          <button
+            class="answer-button"
+            type="button"
+            [disabled]="selectedOptionId() !== null"
+            [class.selected]="selectedOptionId() === option.id"
+            [class.correct]="gameService.lastResult() !== null && option.id === gameService.lastResult()!.correctAnswerId"
+            [class.wrong]="gameService.lastResult() !== null && selectedOptionId() === option.id && !gameService.lastResult()!.correct"
+            (click)="selectAnswer(option.id)"
+          >
+            {{ option.text }}
+          </button>
+        }
+      </div>
+    </section>
+  } @else {
+    <section class="quiz-card">
+      <p>Verbinde mit Server...</p>
+    </section>
+  }
 </main>

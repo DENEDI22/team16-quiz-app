@@ -1,0 +1,123 @@
+import { inject, Injectable, signal } from '@angular/core';
+
+function decodeHtml(html: string): string {
+  const txt = document.createElement('textarea');
+  txt.innerHTML = html;
+  return txt.value;
+}
+import { Subscription } from 'rxjs';
+import { AnswerResultMsg, GameOverMsg, QuestionMsg, ServerMsg } from '../../models/questions';
+import { WebsocketService } from '../ws/WebsocketService';
+
+@Injectable({
+  providedIn: 'root',
+})
+export class GameService {
+  private websocket = inject(WebsocketService);
+  private subscriptions = new Subscription();
+  private questionStartTime = 0;
+
+  lives = signal(0);
+  score = signal(0);
+  currentQuestion = signal<QuestionMsg | null>(null);
+  lastResult = signal<AnswerResultMsg | null>(null);
+  gameOver = signal<GameOverMsg | null>(null);
+  categories = signal<string[]>([]);
+  difficulty = signal<string>('');
+
+  startGame(baseUrl: string, categories: string[], difficulty: string): void {
+    this.subscriptions.unsubscribe();
+    this.subscriptions = new Subscription();
+
+    this.lives.set(0);
+    this.score.set(0);
+    this.currentQuestion.set(null);
+    this.lastResult.set(null);
+    this.gameOver.set(null);
+    this.categories.set(categories);
+    this.difficulty.set(difficulty);
+
+    this.subscriptions.add(
+      this.websocket.connected$.subscribe(() => {
+        const token = localStorage.getItem('token') ?? '';
+        this.websocket.send(JSON.stringify({ type: 'start_game', token }));
+      }),
+    );
+
+    this.subscriptions.add(this.websocket.messages$.subscribe((raw) => this.handleMessage(raw)));
+
+    const wsUrl = this.buildWsUrl(baseUrl, categories, difficulty);
+    console.log('[GameService] WebSocket URL:', wsUrl);
+    this.websocket.connect(wsUrl);
+  }
+
+  private buildWsUrl(baseUrl: string, categories: string[], difficulty: string): string {
+    const params = new URLSearchParams();
+    const realCategories = categories.filter((c) => c !== 'All');
+    if (realCategories.length > 0) {
+      params.set('categories', realCategories.join(','));
+    }
+    if (difficulty && difficulty !== 'all') {
+      params.set('difficulty', difficulty);
+    }
+    const query = params.toString();
+    return query ? `${baseUrl}?${query}` : baseUrl;
+  }
+
+  submitAnswer(answerId: number): void {
+    const question = this.currentQuestion();
+    if (!question) return;
+    const token = localStorage.getItem('token') ?? '';
+    const elapsed = Math.floor((Date.now() - this.questionStartTime) / 1000);
+    this.websocket.send(
+      JSON.stringify({
+        type: 'submit_answer',
+        token,
+        questionId: question.questionId,
+        answerId,
+        timeToAnswerSeconds: elapsed,
+      }),
+    );
+  }
+
+  cleanup(): void {
+    this.subscriptions.unsubscribe();
+    this.websocket.disconnect();
+  }
+
+  private handleMessage(raw: string): void {
+    let msg: ServerMsg;
+    try {
+      msg = JSON.parse(raw);
+    } catch {
+      console.error('Ungültige WebSocket-Nachricht:', raw);
+      return;
+    }
+
+    switch (msg.type) {
+      case 'game_started':
+        this.lives.set(msg.livesRemaining);
+        break;
+      case 'question':
+        this.lastResult.set(null);
+        this.currentQuestion.set({
+          ...msg,
+          questionText: decodeHtml(msg.questionText),
+          options: msg.options.map((o) => ({ ...o, text: decodeHtml(o.text) })),
+        });
+        this.questionStartTime = Date.now();
+        break;
+      case 'answer_result':
+        this.lastResult.set(msg);
+        this.lives.set(msg.livesRemaining);
+        this.score.set(msg.totalScore);
+        break;
+      case 'game_over':
+        this.gameOver.set(msg);
+        break;
+      case 'error':
+        console.error('Server-Fehler:', msg.message);
+        break;
+    }
+  }
+}

@@ -1,38 +1,44 @@
-import { Component, signal } from '@angular/core';
+import { Component, computed, effect, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { getCategoryLabel, getDifficultyLabel } from '../../models/quiz-options';
+import { GameService } from '../../services/quiz/game-service';
 
 @Component({
   selector: 'app-single-player-quiz',
   standalone: true,
   imports: [RouterLink],
   templateUrl: './single-player-quiz.html',
-  styleUrl: './single-player-quiz.scss'
+  styleUrl: './single-player-quiz.scss',
 })
-export class SinglePlayerQuiz {
-  lives = signal(3);
-  score = signal(0);
-  selectedAnswer = signal('');
+export class SinglePlayerQuiz implements OnInit, OnDestroy {
+  protected gameService = inject(GameService);
+  selectedOptionId = signal<number | null>(null);
 
-  question = signal({
-    category: 'Sport',
-    difficulty: 'Einfach',
-    text: 'In welchem Sport wird ein Shuttlecock verwendet?',
-    answers: [
-      'Badminton',
-      'Rugby',
-      'Cricket',
-      'Tischtennis'
-    ],
-    correctAnswer: 'Badminton'
-  });
+  categoryLabel = computed(() => getCategoryLabel(this.gameService.categories()));
+  difficultyLabel = computed(() => getDifficultyLabel(this.gameService.difficulty()));
 
-  selectAnswer(answer: string): void {
-    this.selectedAnswer.set(answer);
+  constructor() {
+    effect(() => {
+      if (this.gameService.currentQuestion() !== null) {
+        this.selectedOptionId.set(null);
+      }
+    });
+  }
 
-    if (answer === this.question().correctAnswer) {
-      this.score.update(score => score + 1);
-    } else {
-      this.lives.update(lives => lives - 1);
-    }
+  ngOnInit(): void {
+    const state = window.history.state as { categories?: string[]; difficulty?: string };
+    const categories = state?.categories ?? [];
+    const difficulty = state?.difficulty ?? 'all';
+    this.gameService.startGame('ws://localhost:7000/ws', categories, difficulty);
+  }
+
+  ngOnDestroy(): void {
+    this.gameService.cleanup();
+  }
+
+  selectAnswer(optionId: number): void {
+    if (this.selectedOptionId() !== null) return;
+    this.selectedOptionId.set(optionId);
+    this.gameService.submitAnswer(optionId);
   }
 }
