@@ -12,28 +12,26 @@
     <h1>Quiz vorbereiten</h1>
 
     <mat-form-field appearance="outline">
-      <mat-label>Kategorie</mat-label>
+      <mat-label>Kategorien</mat-label>
 
-      <mat-select [(ngModel)]="category">
+      <mat-select [(ngModel)]="categories" multiple>
 
-        <mat-option value="sports">
-          Sport
+        <mat-option
+          value="All"
+          (click)="toggleAllCategories()"
+        >
+          Alle
         </mat-option>
 
-        <mat-option value="history">
-          Geschichte
-        </mat-option>
-
-        <mat-option value="music">
-          Musik
-        </mat-option>
-
-        <mat-option value="computer">
-          Computer
-        </mat-option>
+        <mat-option value="Sports">Sport</mat-option>
+        <mat-option value="History">Geschichte</mat-option>
+        <mat-option value="Geography">Geografie</mat-option>
+        <mat-option value="Entertainment: Music">Musik</mat-option>
+        <mat-option value="Science: Computers">Computer</mat-option>
+        <mat-option value="Entertainment: Video Games">Videospiele</mat-option>
+        <mat-option value="General Knowledge">Allgemeinwissen</mat-option>
 
       </mat-select>
-
     </mat-form-field>
 
     <mat-form-field appearance="outline">
@@ -57,12 +55,15 @@
 
     </mat-form-field>
 
-    <a
+    <button
       class="start-button"
-      routerLink="/single-player"
+      mat-raised-button
+      color="primary"
+      [disabled]="categories.length === 0 || !difficulty"
+      (click)="startQuiz()"
     >
       Quiz starten
-    </a>
+    </button>
 
   </section>
 

@@ -45,21 +45,10 @@ h1 {
   text-align: center;
 }
 
-.start-button {
-  margin-top: 1rem;
-
-  text-decoration: none;
-
-  background: #ffce63;
-  color: #07113e;
-
-  padding: 1rem;
-
-  border-radius: 8px;
-
-  font-weight: 700;
-
-  text-align: center;
+.mat-mdc-raised-button:disabled {
+  background-color: #5c637d !important;
+  color: #d0d0d0 !important;
+  opacity: 1 !important;
 }
 mat-form-field {
   width: 100%;

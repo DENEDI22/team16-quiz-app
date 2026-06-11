@@ -14,9 +14,9 @@ interface LoginRequest {
 
 interface AuthResponse {
   success: boolean;
-  token?: string;
   data?: {
-    message: string;
+    token?: string;
+    message?: string;
   };
 }
 

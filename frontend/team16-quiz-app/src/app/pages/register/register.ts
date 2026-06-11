@@ -7,6 +7,7 @@ import {MatInputModule} from '@angular/material/input';
 import {MatButtonModule} from '@angular/material/button';
 import {MatProgressSpinnerModule} from '@angular/material/progress-spinner';
 import {AuthService} from '../../services/auth/auth';
+import {Router} from '@angular/router';
 
 @Component({
   selector: 'app-register',
@@ -29,6 +30,7 @@ export class Register {
   successMessage = signal('');
   private authService = inject(AuthService);
   registerForm;
+  private router = inject(Router);
 
   constructor(private fb: FormBuilder) {
     this.registerForm = this.fb.group({
@@ -59,11 +61,13 @@ export class Register {
       next: (response) => {
         this.isLoading.set(false);
 
-        if (response.token) {
-          localStorage.setItem('token', response.token);
-        }
+        const token = response.data?.token;
 
+        if (token) {
+          localStorage.setItem('token', token);
+        }
         this.successMessage.set('Registrierung erfolgreich.');
+        this.router.navigate(['/game-mode']);
       },
       error: (error) => {
         this.isLoading.set(false);

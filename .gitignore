@@ -23,3 +23,5 @@ target
 .vscode/
 db-data/
 **/*.env
+
+node_modules/

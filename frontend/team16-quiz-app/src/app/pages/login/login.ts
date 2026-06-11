@@ -53,18 +53,24 @@ export class Login {
       email: formValue.email!,
       password: formValue.password!,
     }).subscribe({
-      next: (response) => {
-        console.log('Login response:', response);
+        next: (response) => {
+          console.log('Login response:', response);
 
-        this.isLoading.set(false);
+          this.isLoading.set(false);
 
-        const token = response.token || response.data?.message;
+          const token = response.data?.token;
 
-        if (token) {
+          if (!token) {
+            this.errorMessage.set('Kein Token vom Server erhalten.');
+            return;
+          }
+
+          console.log('Login successful, token received:', token);
+
           localStorage.setItem('token', token);
-          this.router.navigate(['/']);
-        }
-      },
+
+          this.router.navigate(['/game-mode']);
+        },
       error: (error) => {
         console.log('Login error:', error);
 
