@@ -1,18 +1,18 @@
 # API Contracts — team16-quiz-app backend
 
-Status: **agreed design, not yet implemented.** This document is the single source of
-truth for data formats between the four backend services (and the frontend). Where
-current code disagrees with this document, the code is wrong — see
-[Required changes per service](#required-changes-per-service).
+Status: **implemented** (backend; the frontend still has to adopt the new shapes).
+This document is the single source of truth for data formats between the four
+backend services (and the frontend). Where code disagrees with this document,
+the code is wrong.
 
-Services:
+Services (host ports as mapped in `docker-compose.yaml`):
 
-| Service | Container port | Talks to |
-|---|---|---|
-| auth-service | 3000 | — |
-| quiz-service | 3000 | OpenTDB (external) |
-| scoreboard-service | 3000 | — |
-| singleplayer-service | 3000 | quiz-service, scoreboard-service |
+| Service | Container port | Host port | Talks to |
+|---|---|---|---|
+| auth-service | 3000 | 3000 | — |
+| quiz-service | 3000 | 4000 | OpenTDB (external) |
+| scoreboard-service | 3000 | 5000 | — |
+| singleplayer-service | 3000 | 6000 | quiz-service, scoreboard-service |
 
 ---
 
@@ -46,7 +46,7 @@ question data; no service may shuffle.
 ### 1.3 JSON field naming
 
 All JSON fields are **camelCase** (`questionId`, `incorrectAnswers`,
-`timeToAnswerMs`). In Rust: `#[serde(rename_all = "camelCase")]` on every
+`timeToAnswerSeconds`). In Rust: `#[serde(rename_all = "camelCase")]` on every
 request/response struct.
 
 ### 1.4 Response envelope
@@ -327,44 +327,54 @@ Response: `201` `{ "success": true, "data": { "duelId": "<uuid>" } }`
 Non-2xx responses from either service MUST be logged with status and body
 (no silent fire-and-forget).
 
+### Messaging flow
+
+```mermaid
+sequenceDiagram
+    participant C as Client (browser)
+    participant S as singleplayer-service
+    participant Q as quiz-service
+    participant B as scoreboard-service
+
+    C->>S: WS connect GET /ws
+    C->>S: start_game { token }
+    Note over S: validate JWT signature & expiry,<br/>user identity = token claims
+    S-->>C: game_started { sessionId, livesRemaining: 3 }
+
+    loop until livesRemaining = 0
+        S->>Q: GET /questions  (Authorization: Bearer token)
+        Q-->>S: 200 { success: true, data: Question }
+        S-->>C: question { questionId, questionText, options[4], questionIndex }
+        C->>S: submit_answer { token, questionId, answerId, timeToAnswerSeconds }
+        Note over S: adopt token if fresher & valid,<br/>grade answer locally
+        S--)B: POST /post-answer  (Bearer token, async — failures logged)
+        S-->>C: answer_result { correct, correctAnswerId, totalScore, livesRemaining }
+    end
+
+    S-->>C: game_over { totalScore, correctAnswers }
+    Note over C,S: handler returns, socket closes
+```
+
+Lifecycle rules:
+
+1. The **first** client message must be `start_game`. Anything else (or an
+   invalid/expired token) → `error` message, connection ends.
+2. After `game_started`, the server drives the loop: it always sends a
+   `question` and then waits for exactly one `submit_answer`.
+3. `submit_answer.questionId` must echo the current question's id; a mismatch
+   → `error`, connection ends.
+4. Scoring: correct answer **+100** points; wrong answer **−1 life**. The game
+   starts with **3 lives** and ends with `game_over` when they reach 0. There
+   is no question limit and no per-question timeout (the client measures
+   `timeToAnswerSeconds` itself).
+5. Grading is local: singleplayer compares `answerId` against the canonical
+   index (§1.2). The scoreboard POST is fire-and-forget — a scoreboard outage
+   never interrupts a running game (failures are logged, not surfaced).
+6. If quiz-service is unreachable or returns non-2xx, the client receives
+   `error` and the connection ends.
+7. Token refresh mid-game: the client refreshes via auth-service `/refresh`
+   over HTTP as usual and simply includes the new token in its next
+   `submit_answer` (§2.4). Invalid replacement tokens are ignored (logged);
+   the previous token stays in use.
+
 ---
-
-## 7. Required changes per service
-
-### auth-service
-- [ ] `/login` success shape → `{ "success": true, "data": { "token": … } }` (same as register)
-- [ ] Register returns `201` (currently `200`)
-- [ ] Error shape → `{ "success": false, "error": { "message": … } }` (currently `data.message`)
-- [ ] Add `POST /refresh` (signature-valid token, `exp` grace ≤ 60 min → re-issue)
-- [ ] Access-token TTL 10 → 15 min
-- [ ] `/health` → `{ "status": "healthy" }` JSON (currently plain text)
-
-### quiz-service
-- [ ] `questions.id`: `SERIAL` → `uuid DEFAULT gen_random_uuid()` (dev DB: drop & recreate)
-- [ ] Response fields → camelCase (`correctAnswer`, `incorrectAnswers`), `id` → `questionId`
-- [ ] Error shape → standard envelope (currently `{success, message}` flat)
-- [ ] Require auth on `/questions` (any role) and `/scrape` (Admin); needs `JWT_SECRET`
-- [ ] Add `shared` dependency for the `Auth` extractor
-
-### scoreboard-service
-- [ ] `CreateAnswerRequest.time_to_answer` field name → `timeToAnswerSeconds`
-- [ ] Success shapes → standard envelope (`{status:"ok",…}` and bare arrays today)
-- [ ] Error shape → standard envelope
-- [ ] `question-stats`: `answerId`/`correctAnswerId` as integers (currently stringified)
-- [ ] Read `JWT_SECRET` from `AppState`, not `var()` per request (cleanup, not contract)
-
-### singleplayer-service
-- [ ] `start_game`: take `token` instead of `userId`; validate JWT, take user id from claims (needs `JWT_SECRET` + `shared` dep)
-- [ ] `submit_answer`: add `token`; rename `timeToAnswer` → `timeToAnswerSeconds`; `answerId` string → int
-- [ ] Drop `"q_…"`/`"a_…"`/`"sess_…"` fabricated IDs; pass question UUID through, full session UUID, integer answer index
-- [ ] `QuizQuestion.id`: `Option<i32>` + hash fallback → required `Uuid`; delete fallback
-- [ ] Forward `Authorization: Bearer <user token>` on both outbound calls; drop `userId` from the post-answer payload
-- [ ] Log non-2xx responses from quiz/scoreboard with status + body
-
-### shared
-- [ ] Delete orphaned `src/models.rs` (broken `User` model, not in `lib.rs`)
-- [ ] Remove placeholder `add()` from `lib.rs`
-
-### docker-compose
-- [ ] `SCOREBOARD_SERVICE_URL` → `http://scoreboard-service:3000` (5000 is the host mapping, unreachable in-network)
-- [ ] Add `JWT_SECRET` to quiz-service and singleplayer-service
