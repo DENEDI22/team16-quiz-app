@@ -1,21 +1,24 @@
 mod db;
 mod jwt;
 mod requests;
-use std::{clone, env::var};
+use std::env::var;
 
 use axum::{
     Json, Router,
-    extract::{FromRequestParts, State},
-    http::{Response, header},
+    extract::{FromRef, State},
+    http::{HeaderMap, Response, StatusCode, header},
     response::IntoResponse,
     routing::{get, post},
 };
+use chrono::{Duration, Utc};
 use dotenvy::dotenv;
 use serde_json::json;
-use shared::jwt::{Claims, decode_jwt};
+use shared::auth::{Auth, JwtSecret};
+use shared::jwt::{Claims, decode_jwt_with_grace, encode_jwt};
+use shared::respond;
 use sqlx::PgPool;
 use tokio::net::TcpListener;
-use tower_http::cors::{CorsLayer, any};
+use tower_http::cors::CorsLayer;
 
 use crate::db::{get_user, migrate};
 use crate::{
@@ -24,10 +27,19 @@ use crate::{
     requests::{LoginRequest, RegisterRequest},
 };
 
-#[derive(clone::Clone)]
+/// How long after `exp` a token is still accepted by `/refresh` (§2.3).
+const REFRESH_GRACE_SECONDS: i64 = 3600;
+
+#[derive(Clone)]
 struct AppState {
     pool: PgPool,
     jwt_secret: String,
+}
+
+impl FromRef<AppState> for JwtSecret {
+    fn from_ref(state: &AppState) -> Self {
+        JwtSecret(state.jwt_secret.clone())
+    }
 }
 
 #[tokio::main]
@@ -50,6 +62,7 @@ async fn main() {
         .route("/health", get(health))
         .route("/register", post(register_handler))
         .route("/login", post(login_handler))
+        .route("/refresh", post(refresh_handler))
         .route("/me", get(me_handler))
         .layer(cors)
         .with_state(state);
@@ -73,173 +86,77 @@ async fn register_handler(
         Ok(user_id) => {
             let user = match get_user(&state.pool, &user_id).await {
                 Ok(user) => user,
-                Err(sqlx::Error::RowNotFound) => return unauthorized("invalid credentials"),
-                Err(e) => return server_error(&e.to_string()),
+                Err(sqlx::Error::RowNotFound) => {
+                    return respond::error(StatusCode::UNAUTHORIZED, "invalid credentials");
+                }
+                Err(e) => return respond::error(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()),
             };
-            let token = jwt::get_jwt(user, state.jwt_secret);
-            match token {
-                Ok(token) => return token_response(&token.to_string()),
-                Err(e) => return unauthorized(&e.to_string()),
+            match jwt::get_jwt(user, state.jwt_secret) {
+                Ok(token) => respond::created(json!({ "token": token })),
+                Err(e) => respond::error(StatusCode::UNAUTHORIZED, &e),
             }
         }
-        Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
-            return conflict("User with this email already exists");
-        }
-        Err(e) => return server_error(&e.to_string()),
+        Err(sqlx::Error::Database(e)) if e.is_unique_violation() => respond::error(
+            StatusCode::CONFLICT,
+            "User with this email already exists",
+        ),
+        Err(e) => respond::error(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()),
     }
 }
+
 async fn login_handler(
     State(state): State<AppState>,
     Json(request): Json<LoginRequest>,
 ) -> Response<String> {
     let user = match find_user_by_email(&state.pool, &request.email).await {
         Ok(user) => user,
-        Err(sqlx::Error::RowNotFound) => return unauthorized("invalid credentials"),
-        Err(e) => return server_error(&e.to_string()),
+        Err(sqlx::Error::RowNotFound) => {
+            return respond::error(StatusCode::UNAUTHORIZED, "invalid credentials");
+        }
+        Err(e) => return respond::error(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()),
     };
 
     match verify_password(&request.password, &user.password_hash) {
-        true => {
-            let token = jwt::get_jwt(user, state.jwt_secret);
-
-            match token {
-                Ok(token) => token_response(&token.to_string()),
-
-                Err(e) => unauthorized(&e.to_string()),
-            }
-        }
-        false => unauthorized("invalid credentials"),
+        true => match jwt::get_jwt(user, state.jwt_secret) {
+            Ok(token) => respond::ok(json!({ "token": token })),
+            Err(e) => respond::error(StatusCode::UNAUTHORIZED, &e),
+        },
+        false => respond::error(StatusCode::UNAUTHORIZED, "invalid credentials"),
     }
 }
 
-fn conflict(msg: &str) -> Response<String> {
-    Response::builder()
-        .status(409)
-        .header(header::CONTENT_TYPE, "application/json")
-        .body(
-            json!({
-                "success": false,
-                "data": {
-                    "message": msg
-                }
-            })
-            .to_string(),
-        )
-        .unwrap_or_default()
-}
+/// Stateless refresh (§2.3): the presented token's signature must be valid and
+/// its `exp` at most [`REFRESH_GRACE_SECONDS`] in the past; a re-signed token
+/// with the same claims and a fresh expiry is returned.
+async fn refresh_handler(State(state): State<AppState>, headers: HeaderMap) -> Response<String> {
+    let token = headers
+        .get(header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "));
 
-fn token_response(token: &str) -> Response<String> {
-    Response::builder()
-        .status(200)
-        .header(header::CONTENT_TYPE, "application/json")
-        .body(
-            json!({
-                "success": true,
-                "token": token,
-            })
-            .to_string(),
-        )
-        .unwrap_or_default()
-}
+    let Some(token) = token else {
+        return respond::error(StatusCode::UNAUTHORIZED, "No token provided");
+    };
 
-fn success(msg: &str) -> Response<String> {
-    Response::builder()
-        .status(200)
-        .header(header::CONTENT_TYPE, "application/json")
-        .body(
-            json!({
-                "success": true,
-                "data": {
-                    "message": msg
-                }
-            })
-            .to_string(),
-        )
-        .unwrap_or_default()
-}
-
-fn unauthorized(msg: &str) -> Response<String> {
-    Response::builder()
-        .status(401)
-        .header(header::CONTENT_TYPE, "application/json")
-        .body(
-            json!({
-                "success": false,
-                "data": {
-                    "message": msg
-                }
-            })
-            .to_string(),
-        )
-        .unwrap_or_default()
-}
-
-fn server_error(msg: &str) -> Response<String> {
-    tracing::error!("internal error: {}", msg);
-    Response::builder()
-        .status(500)
-        .header(header::CONTENT_TYPE, "application/json")
-        .body(
-            json!({
-                "success": false,
-                "data": {
-                    "message": msg
-                }
-            })
-            .to_string(),
-        )
-        .unwrap_or_default()
+    match decode_jwt_with_grace(token, &state.jwt_secret, REFRESH_GRACE_SECONDS) {
+        Ok(claims) => {
+            let refreshed = Claims {
+                exp: (Utc::now() + Duration::minutes(jwt::TOKEN_TTL_MINUTES)).timestamp(),
+                ..claims
+            };
+            match encode_jwt(&refreshed, &state.jwt_secret) {
+                Ok(token) => respond::ok(json!({ "token": token })),
+                Err(e) => respond::error(StatusCode::INTERNAL_SERVER_ERROR, &e),
+            }
+        }
+        Err(e) => respond::error(StatusCode::UNAUTHORIZED, &e),
+    }
 }
 
 async fn me_handler(Auth(claims): Auth) -> Response<String> {
-    Response::builder()
-        .status(200)
-        .header(header::CONTENT_TYPE, "application/json")
-        .body(
-            json!({
-                "success": true,
-                "data": claims
-            })
-            .to_string(),
-        )
-        .unwrap_or_default()
-}
-
-pub struct Auth(Claims);
-
-#[cfg_attr(cfg, async_trait)]
-impl<S> FromRequestParts<S> for Auth
-where
-    S: Send + Sync,
-{
-    type Rejection = Response<String>;
-
-    async fn from_request_parts(
-        parts: &mut axum::http::request::Parts,
-        _: &S,
-    ) -> Result<Self, Self::Rejection> {
-        let access_token = parts
-            .headers
-            .get(header::AUTHORIZATION)
-            .and_then(|value| value.to_str().ok())
-            .and_then(|value| value.split(" ").nth(1));
-
-        match access_token {
-            Some(token) => {
-                let claims = decode_jwt(token, var("JWT_SECRET").unwrap());
-
-                match claims {
-                    Ok(claims) => Ok(Auth(claims)),
-
-                    Err(e) => Err(unauthorized(&e.to_string())),
-                }
-            }
-
-            None => Err(unauthorized("No token provided")),
-        }
-    }
+    respond::ok(json!(claims))
 }
 
 async fn health() -> impl IntoResponse {
-    "healthy"
+    Json(json!({ "status": "healthy" }))
 }
