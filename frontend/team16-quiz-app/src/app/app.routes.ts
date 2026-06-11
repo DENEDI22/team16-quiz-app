@@ -6,6 +6,7 @@ import {Home} from './pages/home/home';
 import {Routes} from '@angular/router';
 import {Login} from './pages/login/login';
 import {Register} from './pages/register/register';
+import { authGuard} from './auth/guards/auth-guard';
 
 export const routes: Routes = [
   {
@@ -15,18 +16,22 @@ export const routes: Routes = [
   {
     path: 'game-mode',
     component: GameMode,
+    canActivate: [authGuard],
   },
   {
     path: 'quiz-setup',
     component: QuizSetup,
+    canActivate: [authGuard],
   },
   {
     path: 'single-player',
     component: SinglePlayerQuiz,
+    canActivate: [authGuard],
   },
   {
     path: 'quiz-result',
     component: QuizResult,
+    canActivate: [authGuard],
   },
   {
     path: 'login',
