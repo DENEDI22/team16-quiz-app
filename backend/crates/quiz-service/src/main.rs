@@ -3,17 +3,24 @@ mod scraper;
 
 use axum::{
     Json, Router,
-    extract::{FromRef, State},
+    extract::{FromRef, Query, State},
     http::{Response, StatusCode},
     response::IntoResponse,
     routing::{get, post},
 };
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use shared::auth::{AdminAuth, Auth, JwtSecret};
 use shared::respond;
 use sqlx::PgPool;
 use tokio::net::TcpListener;
 use tokio_cron_scheduler::{Job, JobScheduler};
+
+#[derive(Debug, Serialize, Deserialize)]
+struct QuestionFilter {
+    categories: Option<String>,
+    difficulty: Option<String>,
+}
 
 #[derive(Clone)]
 struct AppState {
@@ -94,8 +101,12 @@ async fn run_scrape(pool: &PgPool) {
     }
 }
 
-async fn get_question(Auth(_claims): Auth, State(state): State<AppState>) -> Response<String> {
-    match db::get_random_question(&state.pool).await {
+async fn get_question(
+    Auth(_claims): Auth,
+    State(state): State<AppState>,
+    Query(filter): Query<QuestionFilter>,
+) -> Response<String> {
+    match db::get_random_question(&state.pool, &filter).await {
         Ok(Some(q)) => respond::ok(json!(q)),
         Ok(None) => respond::error(StatusCode::NOT_FOUND, "No questions in database yet"),
         Err(e) => {

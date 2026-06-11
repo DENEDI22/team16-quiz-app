@@ -3,10 +3,11 @@ mod ws_handler;
 
 use axum::{
     Router,
-    extract::{State, WebSocketUpgrade},
+    extract::{Query, State, WebSocketUpgrade},
     response::IntoResponse,
     routing::get,
 };
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::net::TcpListener;
 use tower_http::cors::CorsLayer;
@@ -17,6 +18,12 @@ pub struct AppState {
     pub quiz_service_url: String,
     pub scoreboard_service_url: String,
     pub jwt_secret: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GameSettings {
+    pub categories: Option<String>,
+    pub difficulty: Option<String>,
 }
 
 #[tokio::main]
@@ -52,8 +59,12 @@ async fn main() {
         .expect("Error serving application");
 }
 
-async fn ws_upgrade(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl IntoResponse {
-    ws.on_upgrade(move |socket| ws_handler::handle_socket(socket, state))
+async fn ws_upgrade(
+    ws: WebSocketUpgrade,
+    State(state): State<AppState>,
+    Query(settings): Query<GameSettings>,
+) -> impl IntoResponse {
+    ws.on_upgrade(move |socket| ws_handler::handle_socket(socket, state, settings))
 }
 
 async fn health() -> impl IntoResponse {

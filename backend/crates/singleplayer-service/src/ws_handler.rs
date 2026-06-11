@@ -4,13 +4,13 @@ use reqwest::header::AUTHORIZATION;
 use shared::jwt::decode_jwt;
 use uuid::Uuid;
 
-use crate::AppState;
 use crate::models::{
     AnswerOption, ClientMsg, PostAnswerPayload, PreparedQuestion, QuizQuestion,
     QuizServiceResponse, ServerMsg,
 };
+use crate::{AppState, GameSettings};
 
-pub async fn handle_socket(mut socket: WebSocket, state: AppState) {
+pub async fn handle_socket(mut socket: WebSocket, state: AppState, settings: GameSettings) {
     let mut token = match wait_for_start(&mut socket, &state).await {
         Some(t) => t,
         None => return,
@@ -38,7 +38,7 @@ pub async fn handle_socket(mut socket: WebSocket, state: AppState) {
     let mut question_index: usize = 0;
 
     loop {
-        let question = match fetch_question(&state, &token).await {
+        let question = match fetch_question(&state, &token, &settings).await {
             Ok(q) => q,
             Err(e) => {
                 send_error(&mut socket, &e).await;
@@ -134,15 +134,13 @@ async fn wait_for_start(socket: &mut WebSocket, state: &AppState) -> Option<Stri
     while let Some(Ok(msg)) = socket.recv().await {
         if let Message::Text(text) = msg {
             match serde_json::from_str::<ClientMsg>(&text) {
-                Ok(ClientMsg::StartGame { token }) => {
-                    match decode_jwt(&token, &state.jwt_secret) {
-                        Ok(_claims) => return Some(token),
-                        Err(e) => {
-                            send_error(socket, &format!("invalid token: {e}")).await;
-                            return None;
-                        }
+                Ok(ClientMsg::StartGame { token }) => match decode_jwt(&token, &state.jwt_secret) {
+                    Ok(_claims) => return Some(token),
+                    Err(e) => {
+                        send_error(socket, &format!("invalid token: {e}")).await;
+                        return None;
                     }
-                }
+                },
                 _ => {
                     send_error(socket, "expected start_game message").await;
                     return None;
@@ -173,11 +171,16 @@ async fn wait_for_answer(socket: &mut WebSocket) -> Option<(Uuid, i32, i32, Stri
     None
 }
 
-async fn fetch_question(state: &AppState, token: &str) -> Result<PreparedQuestion, String> {
+async fn fetch_question(
+    state: &AppState,
+    token: &str,
+    settings: &GameSettings,
+) -> Result<PreparedQuestion, String> {
     let resp = state
         .http_client
         .get(format!("{}/questions", state.quiz_service_url))
         .header(AUTHORIZATION, format!("Bearer {token}"))
+        .query(&settings)
         .send()
         .await
         .map_err(|e| format!("quiz-service unreachable: {e}"))?;

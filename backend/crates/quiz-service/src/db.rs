@@ -2,7 +2,7 @@ use serde::Serialize;
 use sqlx::{PgPool, postgres::PgPoolOptions};
 use uuid::Uuid;
 
-use crate::scraper::Question;
+use crate::{QuestionFilter, scraper::Question};
 
 #[derive(Debug, sqlx::FromRow, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -58,11 +58,31 @@ pub async fn insert_questions(pool: &PgPool, questions: &[Question]) -> Result<u
     Ok(inserted)
 }
 
-pub async fn get_random_question(pool: &PgPool) -> Result<Option<QuestionWithId>, sqlx::Error> {
+pub async fn get_random_question(
+    pool: &PgPool,
+    filter: &QuestionFilter,
+) -> Result<Option<QuestionWithId>, sqlx::Error> {
+    let categories: Option<Vec<String>> = filter
+        .categories
+        .as_deref()
+        .map(|s| {
+            s.split(',')
+                .map(|c| c.trim().to_string())
+                .filter(|c| !c.is_empty())
+                .collect::<Vec<_>>()
+        })
+        .filter(|v: &Vec<_>| !v.is_empty());
+
     sqlx::query_as::<_, QuestionWithId>(
         "SELECT id, category, difficulty, question, correct_answer, incorrect_answers
-         FROM questions ORDER BY RANDOM() LIMIT 1",
+         FROM questions 
+         WHERE ($1::text[] IS NULL OR category = ANY($1))
+           AND ($2::text IS NULL OR difficulty = $2)
+         ORDER BY RANDOM() LIMIT 1
+         ",
     )
+    .bind(categories)
+    .bind(filter.difficulty.clone())
     .fetch_optional(pool)
     .await
 }
