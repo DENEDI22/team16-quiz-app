@@ -41,7 +41,7 @@ services:
       context: ./backend/
       dockerfile: ./crates/scoreboard-service/dockerfile
     environment:
-      DATABASE_URL: postgres://admin:Start123!@db-quiz-app:5432/scoreboard-service-db
+      DATABASE_URL: postgres://admin:Start123!@db-quiz-app:5432/scoreboard-service
       JWT_SECRET: dev-only-secret
     ports:
       - "5000:3000"
@@ -58,7 +58,7 @@ services:
       QUIZ_SERVICE_URL: "http://quiz-service:3000"
       SCOREBOARD_SERVICE_URL: "http://scoreboard-service:3000"
     ports:
-      - "6000:3000"
+      - "7000:3000"
     depends_on:
       - quiz-service
 
