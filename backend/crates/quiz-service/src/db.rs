@@ -76,7 +76,7 @@ pub async fn get_random_question(
     sqlx::query_as::<_, QuestionWithId>(
         "SELECT id, category, difficulty, question, correct_answer, incorrect_answers
          FROM questions 
-         WHERE ($1::text IS NULL OR category = ANY($1))
+         WHERE ($1::text[] IS NULL OR category = ANY($1))
            AND ($2::text IS NULL OR difficulty = $2)
          ORDER BY RANDOM() LIMIT 1
          ",

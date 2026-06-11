@@ -26,7 +26,7 @@ hyphenated string, e.g. `"550e8400-e29b-41d4-a716-446655440000"`):
 | Entity | Owned by | Notes |
 |---|---|---|
 | user | auth-service | already UUID |
-| question | quiz-service | **changes** from `SERIAL` (i32) to `uuid` |
+| question | quiz-service | `uuid` (migrated from `SERIAL`/i32) |
 | answer record | scoreboard-service | already UUID |
 | duel | scoreboard-service | already UUID |
 | session | singleplayer-service | full `Uuid::new_v4()`, **no** `sess_` prefix / truncation |
@@ -180,7 +180,21 @@ All endpoints require auth (§2.1).
 
 ### GET /questions — auth (any role)
 
-Returns one random question.
+Returns one random question, optionally filtered.
+
+Query parameters (both optional, combinable):
+
+| Param | Format | Semantics |
+|---|---|---|
+| `categories` | comma-separated exact category names, e.g. `categories=Science: Computers,History` | the question's category must be **one of** the listed values (OR). Names must exactly match the stored OpenTDB categories (case-sensitive); empty entries are ignored; unknown names simply never match |
+| `difficulty` | `easy` \| `medium` \| `hard` | exact match |
+
+```sh
+curl -s -G "http://localhost:4000/questions" \
+  --data-urlencode "categories=Science: Computers,History" \
+  --data-urlencode "difficulty=easy" \
+  -H "Authorization: Bearer $TOKEN"
+```
 
 ```jsonc
 // 200
@@ -197,7 +211,8 @@ Returns one random question.
 }
 ```
 
-`404` if the questions table is empty.
+`404` if the questions table is empty **or no question matches the given
+filters**.
 
 > `questionId` is never optional and never derived (no hash fallback in
 > consumers). DB schema: `id uuid DEFAULT gen_random_uuid() PRIMARY KEY`.
@@ -274,14 +289,24 @@ Response: `201` `{ "success": true, "data": { "duelId": "<uuid>" } }`
 }
 ```
 
-`404` if no answers recorded. `answerId`/`correctAnswerId` are integers
-(currently stringified ints — changes).
+`404` if no answers recorded. `answerId`/`correctAnswerId` are integers.
 
 ---
 
 ## 6. singleplayer-service (WebSocket)
 
-`GET /ws` upgrades to a WebSocket. All messages are JSON with a `type` tag.
+`GET /ws` upgrades to a WebSocket. Optional query parameters on the upgrade
+URL fix the session's game settings **at the moment the socket opens**
+(changing them requires a new connection):
+
+| Param | Format |
+|---|---|
+| `categories` | comma-separated category names, forwarded verbatim to quiz-service (§4) |
+| `difficulty` | `easy` \| `medium` \| `hard` |
+
+Example: `ws://localhost:6000/ws?categories=Science%3A%20Computers,History&difficulty=easy`
+
+All messages are JSON with a `type` tag.
 
 ### Client → server
 
@@ -321,7 +346,7 @@ Response: `201` `{ "success": true, "data": { "duelId": "<uuid>" } }`
 
 | Call | Contract | Auth |
 |---|---|---|
-| `GET {QUIZ_SERVICE_URL}/questions` | §4 | forward user token |
+| `GET {QUIZ_SERVICE_URL}/questions?categories=…&difficulty=…` (session settings, omitted when unset) | §4 | forward user token |
 | `POST {SCOREBOARD_SERVICE_URL}/post-answer` | §5 | forward user token |
 
 Non-2xx responses from either service MUST be logged with status and body
@@ -336,13 +361,14 @@ sequenceDiagram
     participant Q as quiz-service
     participant B as scoreboard-service
 
-    C->>S: WS connect GET /ws
+    C->>S: WS connect GET /ws?categories&difficulty
+    Note over S: game settings fixed for this session
     C->>S: start_game { token }
     Note over S: validate JWT signature & expiry,<br/>user identity = token claims
     S-->>C: game_started { sessionId, livesRemaining: 3 }
 
     loop until livesRemaining = 0
-        S->>Q: GET /questions  (Authorization: Bearer token)
+        S->>Q: GET /questions?categories&difficulty  (Authorization: Bearer token)
         Q-->>S: 200 { success: true, data: Question }
         S-->>C: question { questionId, questionText, options[4], questionIndex }
         C->>S: submit_answer { token, questionId, answerId, timeToAnswerSeconds }
@@ -371,7 +397,9 @@ Lifecycle rules:
    index (§1.2). The scoreboard POST is fire-and-forget — a scoreboard outage
    never interrupts a running game (failures are logged, not surfaced).
 6. If quiz-service is unreachable or returns non-2xx, the client receives
-   `error` and the connection ends.
+   `error` and the connection ends. Note that overly narrow session settings
+   (e.g. a rare category + `hard`) make quiz-service's 404 a *user-reachable*
+   state — the game then ends with an `error` right after `game_started`.
 7. Token refresh mid-game: the client refreshes via auth-service `/refresh`
    over HTTP as usual and simply includes the new token in its next
    `submit_answer` (§2.4). Invalid replacement tokens are ignored (logged);
