@@ -1,19 +1,23 @@
 import { inject, Injectable, signal } from '@angular/core';
+import { Router } from '@angular/router';
+import { Subscription } from 'rxjs';
+import { AnswerResultMsg, GameOverMsg, QuestionMsg, ServerMsg } from '../../models/questions';
+import { AuthService } from '../auth/auth';
+import { WebsocketService } from '../ws/WebsocketService';
 
 function decodeHtml(html: string): string {
   const txt = document.createElement('textarea');
   txt.innerHTML = html;
   return txt.value;
 }
-import { Subscription } from 'rxjs';
-import { AnswerResultMsg, GameOverMsg, QuestionMsg, ServerMsg } from '../../models/questions';
-import { WebsocketService } from '../ws/WebsocketService';
 
 @Injectable({
   providedIn: 'root',
 })
 export class GameService {
   private websocket = inject(WebsocketService);
+  private authService = inject(AuthService);
+  private router = inject(Router);
   private subscriptions = new Subscription();
   private questionStartTime = 0;
 
@@ -121,7 +125,12 @@ export class GameService {
         this.gameOver.set(msg);
         break;
       case 'error':
-        console.error('Server-Fehler:', msg.message);
+        if (msg.message.toLowerCase().includes('expired')) {
+          this.authService.logout();
+          this.router.navigate(['/login']);
+        } else {
+          console.error('Server-Fehler:', msg.message);
+        }
         break;
     }
   }
