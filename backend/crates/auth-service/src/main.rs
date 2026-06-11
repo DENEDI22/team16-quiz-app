@@ -96,10 +96,9 @@ async fn register_handler(
                 Err(e) => respond::error(StatusCode::UNAUTHORIZED, &e),
             }
         }
-        Err(sqlx::Error::Database(e)) if e.is_unique_violation() => respond::error(
-            StatusCode::CONFLICT,
-            "User with this email already exists",
-        ),
+        Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
+            respond::error(StatusCode::CONFLICT, "User with this email already exists")
+        }
         Err(e) => respond::error(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()),
     }
 }

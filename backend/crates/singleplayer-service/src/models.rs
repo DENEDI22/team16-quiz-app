@@ -6,9 +6,7 @@ use uuid::Uuid;
 pub enum ClientMsg {
     /// Carries the user's access token; the user identity comes from its
     /// claims, never from a client-supplied id (docs/api-contracts.md §2.4).
-    StartGame {
-        token: String,
-    },
+    StartGame { token: String },
     SubmitAnswer {
         /// The client's *current* access token, refreshed as needed; the
         /// freshest valid one is forwarded to scoreboard-service.
