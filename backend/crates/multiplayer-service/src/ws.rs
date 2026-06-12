@@ -9,8 +9,8 @@ use shared::jwt::decode_jwt;
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
-use crate::duel::{DuelEvent, duel_task};
-use crate::models::{ClientMsg, PlayerInfo, ServerMsg};
+use crate::duel::{self, DuelEvent, duel_task};
+use crate::models::{ClientMsg, DuelCheckpoint, Lobby, PlayerInfo, ServerMsg};
 use crate::{AppState, cache};
 
 const OUTBOUND_BUFFER: usize = 64;
@@ -122,9 +122,17 @@ async fn wait_for_hello(socket: &mut WebSocket, state: &AppState) -> Option<(Pla
     None
 }
 
+/// What a not-yet-running duel gets spawned from: a Redis lobby (game has
+/// not started) or a Redis checkpoint (game was running when the service
+/// died — resume it).
+enum DuelSource {
+    FreshLobby(Box<Lobby>),
+    Checkpoint(Box<DuelCheckpoint>),
+}
+
 /// Returns the event sender of the lobby's duel actor, spawning one if this
 /// is the first connection. The double-checked locking is needed because the
-/// Redis lookup must happen outside the registry lock (it awaits).
+/// Redis lookups must happen outside the registry lock (they await).
 async fn find_or_spawn_duel(
     state: &AppState,
     lobby_id: Uuid,
@@ -134,10 +142,19 @@ async fn find_or_spawn_duel(
     }
 
     let mut redis = state.redis.clone();
-    let lobby = cache::get_lobby_by_key(&mut redis, lobby_id)
+    let source = if let Some(lobby) = cache::get_lobby_by_key(&mut redis, lobby_id)
         .await
         .map_err(|e| format!("redis error: {e}"))?
-        .ok_or_else(|| "lobby does not exist or has expired".to_string())?;
+    {
+        DuelSource::FreshLobby(Box::new(lobby))
+    } else if let Some(checkpoint) = cache::get_duel_checkpoint(&mut redis, lobby_id)
+        .await
+        .map_err(|e| format!("redis error: {e}"))?
+    {
+        DuelSource::Checkpoint(Box::new(checkpoint))
+    } else {
+        return Err("lobby does not exist or has expired".to_string());
+    };
 
     let mut duels = state.duels.lock().unwrap();
     if let Some(tx) = duels.get(&lobby_id) {
@@ -145,7 +162,14 @@ async fn find_or_spawn_duel(
     }
     let (tx, rx) = mpsc::channel::<DuelEvent>(64);
     duels.insert(lobby_id, tx.clone());
-    tokio::spawn(duel_task(state.clone(), lobby, rx));
+    match source {
+        DuelSource::FreshLobby(lobby) => {
+            tokio::spawn(duel_task(state.clone(), *lobby, rx));
+        }
+        DuelSource::Checkpoint(checkpoint) => {
+            tokio::spawn(duel::resume_task(state.clone(), lobby_id, *checkpoint, rx));
+        }
+    }
     Ok(tx)
 }
 

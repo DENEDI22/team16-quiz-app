@@ -8,9 +8,12 @@ export class WebsocketService {
   private socket?: WebSocket;
   private messagesSubject = new Subject<string>();
   private connectedSubject = new Subject<void>();
+  private closedSubject = new Subject<CloseEvent>();
 
   messages$ = this.messagesSubject.asObservable();
   connected$ = this.connectedSubject.asObservable();
+  /** Feuert bei jedem Verbindungsende — Basis für Auto-Reconnect. */
+  closed$ = this.closedSubject.asObservable();
 
   connect(url: string): void {
     if (this.socket?.readyState === WebSocket.OPEN) return;
@@ -33,6 +36,7 @@ export class WebsocketService {
 
     this.socket.onclose = (event) => {
       console.log('[WS] Geschlossen — Code:', event.code, 'Grund:', event.reason);
+      this.closedSubject.next(event);
     };
   }
 

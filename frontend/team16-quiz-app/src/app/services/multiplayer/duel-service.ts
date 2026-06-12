@@ -21,6 +21,7 @@ function decodeHtml(html: string): string {
 export type DuelStatus = 'connecting' | 'waiting' | 'playing' | 'over';
 
 const QUESTION_SECONDS = 5;
+const MAX_RECONNECT_ATTEMPTS = 8;
 
 @Injectable({
   providedIn: 'root',
@@ -31,6 +32,14 @@ export class DuelService {
   private router = inject(Router);
   private subscriptions = new Subscription();
   private countdownTimer: ReturnType<typeof setInterval> | null = null;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private reconnectAttempts = 0;
+  /** Wollen wir gerade verbunden sein? false nach cleanup/Spielende/Fehler. */
+  private wantConnection = false;
+  /** Sofort gesetzt (ohne Anzeige-Delay), damit der Close nach game_over
+   *  keinen Reconnect auslöst. */
+  private gameOverReceived = false;
+  private wsUrl = '';
 
   status = signal<DuelStatus>('connecting');
   host = signal<PlayerInfo | null>(null);
@@ -45,6 +54,8 @@ export class DuelService {
   errorMessage = signal('');
   /** Verbleibende Antwortzeit der aktuellen Frage in Sekunden (Anzeige). */
   secondsLeft = signal(QUESTION_SECONDS);
+  /** true, während die Verbindung nach einem Abbruch neu aufgebaut wird. */
+  reconnecting = signal(false);
 
   myUserId = signal('');
   isHost = computed(() => this.myUserId() !== '' && this.myUserId() === this.host()?.id);
@@ -71,6 +82,12 @@ export class DuelService {
     this.subscriptions.unsubscribe();
     this.subscriptions = new Subscription();
     this.stopCountdown();
+    this.stopReconnectTimer();
+    this.wantConnection = true;
+    this.gameOverReceived = false;
+    this.reconnectAttempts = 0;
+    this.reconnecting.set(false);
+    this.wsUrl = `${MULTIPLAYER_WS_URL}/duels/${lobbyId}/ws`;
 
     this.status.set('connecting');
     this.host.set(null);
@@ -87,13 +104,42 @@ export class DuelService {
 
     this.subscriptions.add(
       this.websocket.connected$.subscribe(() => {
+        this.reconnectAttempts = 0;
+        this.reconnecting.set(false);
         const token = localStorage.getItem('token') ?? '';
         this.websocket.send(JSON.stringify({ type: 'hello', token }));
       }),
     );
     this.subscriptions.add(this.websocket.messages$.subscribe((raw) => this.handleMessage(raw)));
+    this.subscriptions.add(this.websocket.closed$.subscribe(() => this.handleClosed()));
 
-    this.websocket.connect(`${MULTIPLAYER_WS_URL}/duels/${lobbyId}/ws`);
+    this.websocket.connect(this.wsUrl);
+  }
+
+  /**
+   * Auto-Reconnect mit Backoff. Der Server kann eine laufende Partie nahtlos
+   * fortsetzen (Resumed-Nachricht) — sogar nach einem Service-Neustart, dank
+   * Redis-Checkpoint. Kein Reconnect nach Spielende, Server-Fehler oder
+   * absichtlichem Verlassen.
+   */
+  private handleClosed(): void {
+    if (!this.wantConnection || this.gameOverReceived || this.errorMessage() !== '') {
+      return;
+    }
+    if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+      this.reconnecting.set(false);
+      this.errorMessage.set('Verbindung zum Server verloren.');
+      return;
+    }
+    this.reconnecting.set(true);
+    const delay = Math.min(1000 * 2 ** this.reconnectAttempts, 10_000);
+    this.reconnectAttempts++;
+    this.reconnectTimer = setTimeout(() => this.websocket.connect(this.wsUrl), delay);
+  }
+
+  private stopReconnectTimer(): void {
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
   }
 
   submitAnswer(answerId: number): void {
@@ -111,6 +157,8 @@ export class DuelService {
   }
 
   cleanup(): void {
+    this.wantConnection = false;
+    this.stopReconnectTimer();
     this.subscriptions.unsubscribe();
     this.stopCountdown();
     this.websocket.disconnect();
@@ -178,6 +226,7 @@ export class DuelService {
         break;
 
       case 'game_over': {
+        this.gameOverReceived = true;
         const delay = this.lastResult() !== null ? 1300 : 0;
         setTimeout(() => {
           this.gameOver.set(msg);
@@ -187,6 +236,7 @@ export class DuelService {
       }
 
       case 'error':
+        this.wantConnection = false; // Server-Fehler sind endgültig
         if (msg.message.toLowerCase().includes('expired')) {
           this.authService.logout();
           this.router.navigate(['/login']);

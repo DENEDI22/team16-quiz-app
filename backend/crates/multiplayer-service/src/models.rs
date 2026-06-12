@@ -55,7 +55,11 @@ pub struct CreateLobbyRequest {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case", rename_all_fields = "camelCase")]
+#[serde(
+    tag = "type",
+    rename_all = "snake_case",
+    rename_all_fields = "camelCase"
+)]
 pub enum ClientMsg {
     /// First message on every (re)connect; identity comes from the token's
     /// claims (docs/api-contracts.md §2.4).
@@ -71,7 +75,11 @@ pub enum ClientMsg {
 }
 
 #[derive(Debug, Clone, Serialize)]
-#[serde(tag = "type", rename_all = "snake_case", rename_all_fields = "camelCase")]
+#[serde(
+    tag = "type",
+    rename_all = "snake_case",
+    rename_all_fields = "camelCase"
+)]
 pub enum ServerMsg {
     /// Sent to the host while no guest has joined yet.
     Waiting,
@@ -132,19 +140,36 @@ pub struct PlayerAnswerResult {
     pub score_delta: i32,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnswerOption {
     /// 1-based option index (docs/api-contracts.md §1.2).
     pub id: i32,
     pub text: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PreparedQuestion {
     pub question_id: Uuid,
     pub question_text: String,
     pub options: Vec<AnswerOption>,
     pub correct_answer_id: i32,
+}
+
+/// Resume point for a running duel, written to Redis at every question
+/// boundary. Restores the duel after a service restart: play continues at
+/// `next_index`, so a question that was in flight when the process died
+/// simply restarts. Deliberately holds no tokens — fresh ones arrive with
+/// the players' `hello` messages on reconnect.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DuelCheckpoint {
+    pub session_id: Uuid,
+    pub host: PlayerInfo,
+    pub host_score: i32,
+    pub guest: PlayerInfo,
+    pub guest_score: i32,
+    pub questions: Vec<PreparedQuestion>,
+    /// 0-based index of the next question to play.
+    pub next_index: usize,
 }
 
 /// quiz-service's `{ "success": true, "data": … }` envelope around a question.

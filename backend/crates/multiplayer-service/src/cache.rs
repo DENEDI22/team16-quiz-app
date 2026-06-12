@@ -1,7 +1,7 @@
 use redis::{AsyncCommands, RedisResult, aio::ConnectionManager};
 use uuid::Uuid;
 
-use crate::models::{Lobby, LobbyStatus, PlayerInfo};
+use crate::models::{DuelCheckpoint, Lobby, LobbyStatus, PlayerInfo};
 
 pub enum JoinError {
     NotFound,
@@ -136,5 +136,37 @@ pub async fn delete_lobby(manager: &mut ConnectionManager, id: Uuid) -> RedisRes
     let id = id.to_string();
     let _: () = manager.del(format!("lobby:{id}")).await?;
     let _: () = manager.srem("lobbies:open", id).await?;
+    Ok(())
+}
+
+/// Checkpoints outlive the duel actor but not the players' patience: if
+/// nobody resumes within the TTL, the duel is gone for good.
+const CHECKPOINT_TTL_SECS: u64 = 600;
+
+pub async fn save_duel_checkpoint(
+    manager: &mut ConnectionManager,
+    lobby_id: Uuid,
+    checkpoint: &DuelCheckpoint,
+) -> RedisResult<()> {
+    let json = serde_json::to_string(checkpoint).expect("checkpoint is always serializable");
+    let _: () = manager
+        .set_ex(format!("duel:{lobby_id}"), json, CHECKPOINT_TTL_SECS)
+        .await?;
+    Ok(())
+}
+
+pub async fn get_duel_checkpoint(
+    manager: &mut ConnectionManager,
+    lobby_id: Uuid,
+) -> RedisResult<Option<DuelCheckpoint>> {
+    let raw: Option<String> = manager.get(format!("duel:{lobby_id}")).await?;
+    Ok(raw.and_then(|json| serde_json::from_str(&json).ok()))
+}
+
+pub async fn delete_duel_checkpoint(
+    manager: &mut ConnectionManager,
+    lobby_id: Uuid,
+) -> RedisResult<()> {
+    let _: () = manager.del(format!("duel:{lobby_id}")).await?;
     Ok(())
 }

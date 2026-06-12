@@ -137,7 +137,7 @@ async fn create_lobby(
         name,
         host: player,
         guest: None,
-        settings: settings,
+        settings,
         status: models::LobbyStatus::Waiting,
         created_at: chrono::Utc::now(),
     };
@@ -146,8 +146,8 @@ async fn create_lobby(
         Ok(()) => {
             return created(json!(lobby));
         }
-        Err(e) => return server_error("Internal error creating the lobby", &e.to_string()),
-    };
+        Err(e) => server_error("Internal error creating the lobby", &e.to_string()),
+    }
 }
 
 async fn get_lobbies_handler(State(state): State<AppState>) -> impl IntoResponse {

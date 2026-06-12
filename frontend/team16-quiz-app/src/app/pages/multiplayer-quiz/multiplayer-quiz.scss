@@ -47,6 +47,13 @@
   color: #ffce63;
   font-size: 0.85rem;
   font-weight: 600;
+
+  &.reconnect-banner {
+    background: rgba(248, 113, 113, 0.1);
+    border-color: rgba(248, 113, 113, 0.45);
+    color: #f87171;
+    animation: track-pulse 1.2s ease-in-out infinite;
+  }
 }
 
 // ── Kopfzeile (Frage + beide Punktestände) ───────────────────────────────────

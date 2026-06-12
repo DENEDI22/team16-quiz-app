@@ -16,9 +16,8 @@ use tokio::time::{Instant, sleep, sleep_until};
 use uuid::Uuid;
 
 use crate::models::{
-    AnswerOption, DuelResultPayload, Lobby, LobbySettings, PlayerAnswerResult, PlayerInfo,
-    PostAnswerPayload,
-    PreparedQuestion, QuizQuestion, QuizServiceResponse, ServerMsg,
+    AnswerOption, DuelCheckpoint, DuelResultPayload, Lobby, LobbySettings, PlayerAnswerResult,
+    PlayerInfo, PostAnswerPayload, PreparedQuestion, QuizQuestion, QuizServiceResponse, ServerMsg,
 };
 use crate::{AppState, cache};
 
@@ -97,10 +96,13 @@ impl PlayerConn {
 
     /// Best-effort send; a slow or gone client must never block the game.
     fn send(&self, msg: ServerMsg) {
-        if let Some(tx) = &self.outbound {
-            if tx.try_send(msg).is_err() {
-                tracing::warn!("dropping message to {}: channel full or closed", self.info.id);
-            }
+        if let Some(tx) = &self.outbound
+            && tx.try_send(msg).is_err()
+        {
+            tracing::warn!(
+                "dropping message to {}: channel full or closed",
+                self.info.id
+            );
         }
     }
 }
@@ -185,7 +187,7 @@ async fn run_duel(state: &AppState, lobby: Lobby, mut events: mpsc::Receiver<Due
             DuelEvent::Answer { .. } => {} // no game yet, ignore
         }
     }
-    let mut guest = guest.expect("guest is connected when the waiting phase ends");
+    let guest = guest.expect("guest is connected when the waiting phase ends");
 
     // ---- Phase 2: setup ----------------------------------------------------
     // The duel now lives in this task's memory; the lobby is no longer
@@ -216,9 +218,83 @@ async fn run_duel(state: &AppState, lobby: Lobby, mut events: mpsc::Receiver<Due
     host.send(started_msg.clone());
     guest.send(started_msg);
 
+    run_game(
+        state, lobby_id, events, host, guest, session_id, questions, 0,
+    )
+    .await;
+}
+
+/// Rebuilds a duel from its Redis checkpoint after a service restart and
+/// continues play at the checkpointed question. Spawned by ws.rs when a
+/// player reconnects and no live actor exists.
+pub async fn resume_task(
+    state: AppState,
+    lobby_id: Uuid,
+    checkpoint: DuelCheckpoint,
+    events: mpsc::Receiver<DuelEvent>,
+) {
+    tracing::info!(
+        "resuming duel {lobby_id} at question {}/{}",
+        checkpoint.next_index + 1,
+        checkpoint.questions.len()
+    );
+    let mut host = PlayerConn::new(checkpoint.host);
+    host.score = checkpoint.host_score;
+    let mut guest = PlayerConn::new(checkpoint.guest);
+    guest.score = checkpoint.guest_score;
+    // Nobody is attached yet; the reconnecting player's Connect event is
+    // already queued and the in-game Connect handler sends them Resumed plus
+    // the current question. The opponent attaches the same way when they
+    // return.
+    run_game(
+        &state,
+        lobby_id,
+        events,
+        host,
+        guest,
+        checkpoint.session_id,
+        checkpoint.questions,
+        checkpoint.next_index,
+    )
+    .await;
+    state.duels.lock().unwrap().remove(&lobby_id);
+    tracing::info!("resumed duel actor for lobby {lobby_id} ended");
+}
+
+/// The question loop plus game over. Writes a checkpoint to Redis at every
+/// question boundary, so a dead process can be resumed losing at most the
+/// question that was in flight (it restarts on resume).
+#[allow(clippy::too_many_arguments)]
+async fn run_game(
+    state: &AppState,
+    lobby_id: Uuid,
+    mut events: mpsc::Receiver<DuelEvent>,
+    mut host: PlayerConn,
+    mut guest: PlayerConn,
+    session_id: Uuid,
+    questions: Vec<PreparedQuestion>,
+    start_index: usize,
+) {
+    let total_questions = questions.len();
+    let mut redis = state.redis.clone();
+
+    // Resume point before the first (or resumed-at) question.
+    save_checkpoint(
+        &mut redis,
+        lobby_id,
+        session_id,
+        &host,
+        &guest,
+        &questions,
+        start_index,
+    )
+    .await;
+
     // ---- Phase 3: question loop --------------------------------------------
-    for (i, question) in questions.iter().enumerate() {
-        let question_index = i + 1;
+    for index0 in start_index..questions.len() {
+        let question = &questions[index0];
+        let question_index = index0 + 1;
+
         let question_msg = ServerMsg::Question {
             question_index,
             question_id: question.question_id,
@@ -364,12 +440,29 @@ async fn run_duel(state: &AppState, lobby: Lobby, mut events: mpsc::Receiver<Due
         host.send(result_msg.clone());
         guest.send(result_msg);
 
+        // Checkpoint immediately after resolving, BEFORE the result pause:
+        // a crash from here on resumes at the next question instead of
+        // replaying (and double-scoring) one that already finished.
+        save_checkpoint(
+            &mut redis,
+            lobby_id,
+            session_id,
+            &host,
+            &guest,
+            &questions,
+            index0 + 1,
+        )
+        .await;
+
         if question_index < total_questions {
             sleep(Duration::from_secs(RESULT_PAUSE_SECONDS)).await;
         }
     }
 
     // ---- Phase 4: game over --------------------------------------------------
+    if let Err(e) = cache::delete_duel_checkpoint(&mut redis, lobby_id).await {
+        tracing::warn!("duel {lobby_id}: failed to delete checkpoint: {e}");
+    }
     let winner = match host.score.cmp(&guest.score) {
         std::cmp::Ordering::Greater => Some(host.info.id),
         std::cmp::Ordering::Less => Some(guest.info.id),
@@ -384,6 +477,30 @@ async fn run_duel(state: &AppState, lobby: Lobby, mut events: mpsc::Receiver<Due
     guest.send(over_msg);
 
     post_duel_result(state, &host.token, session_id, &host, &guest).await;
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn save_checkpoint(
+    redis: &mut redis::aio::ConnectionManager,
+    lobby_id: Uuid,
+    session_id: Uuid,
+    host: &PlayerConn,
+    guest: &PlayerConn,
+    questions: &[PreparedQuestion],
+    next_index: usize,
+) {
+    let checkpoint = DuelCheckpoint {
+        session_id,
+        host: host.info.clone(),
+        host_score: host.score,
+        guest: guest.info.clone(),
+        guest_score: guest.score,
+        questions: questions.to_vec(),
+        next_index,
+    };
+    if let Err(e) = cache::save_duel_checkpoint(redis, lobby_id, &checkpoint).await {
+        tracing::warn!("duel {lobby_id}: failed to write checkpoint: {e}");
+    }
 }
 
 /// Applies one player's answer (if any): updates their score, reports the
