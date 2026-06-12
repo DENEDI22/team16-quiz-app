@@ -1,0 +1,63 @@
+<main class="lobbies-page">
+  <a class="logo-link" routerLink="/">
+    <img src="/assets/images/quiz-logo-clean.png" alt="Team16 Quiz Logo" />
+  </a>
+
+  <section class="lobbies-card" @fadeIn>
+    <div class="lobbies-header">
+      <div>
+        <h1>Multiplayer-Lobbys</h1>
+        <p class="subtitle">Tritt einer Lobby bei oder erstelle deine eigene.</p>
+      </div>
+      <button mat-raised-button color="primary" (click)="openCreateDialog()">
+        + Lobby erstellen
+      </button>
+    </div>
+
+    @if (errorMessage()) {
+      <p class="error-message">{{ errorMessage() }}</p>
+    }
+
+    @if (isLoading()) {
+      <div class="connecting">
+        <div class="spinner"></div>
+        <p>Lade Lobbys...</p>
+      </div>
+    } @else if (lobbies().length === 0) {
+      <div class="empty-state">
+        <p>Gerade ist keine Lobby offen.</p>
+        <p class="hint">Erstelle eine eigene und fordere jemanden heraus!</p>
+      </div>
+    } @else {
+      <ul class="lobby-list">
+        @for (lobby of lobbies(); track lobby.id) {
+          <li class="lobby-row">
+            <div class="lobby-info">
+              <strong class="lobby-name">{{ lobby.name }}</strong>
+              <span class="lobby-host">von {{ lobby.host.username }}</span>
+              <div class="lobby-tags">
+                <span class="tag">{{ categoryLabel(lobby) }}</span>
+                <span class="tag">{{ difficultyLabel(lobby) }}</span>
+                <span class="tag">{{ lobby.settings.questionCount }} Fragen</span>
+              </div>
+            </div>
+            <button
+              mat-raised-button
+              color="primary"
+              [disabled]="joiningId() !== null"
+              (click)="joinLobby(lobby)"
+            >
+              @if (joiningId() === lobby.id) {
+                Beitreten...
+              } @else {
+                Beitreten
+              }
+            </button>
+          </li>
+        }
+      </ul>
+    }
+
+    <a class="back-link" routerLink="/game-mode">← Zurück zur Modusauswahl</a>
+  </section>
+</main>

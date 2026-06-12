@@ -1,0 +1,116 @@
+<main class="quiz-page">
+  <a class="logo-link" routerLink="/">
+    <img src="/assets/images/quiz-logo-clean.png" alt="Team16 Quiz Logo" />
+  </a>
+
+  @if (duel.errorMessage()) {
+    <section class="quiz-card error-card" @fadeIn>
+      <h1>Duell nicht möglich</h1>
+      <p class="subtitle">{{ duel.errorMessage() }}</p>
+      <a class="home-button" routerLink="/multiplayer">Zurück zu den Lobbys</a>
+    </section>
+
+  } @else if (duel.gameOver(); as over) {
+    <section class="quiz-card game-over-card" @fadeIn>
+      <h1>{{ gameOverText() }}</h1>
+      <p class="subtitle">Das Duell ist vorbei — hier ist das Ergebnis</p>
+
+      <div class="final-scores">
+        <div class="final-player" [class.winner]="over.winner === duel.host()?.id">
+          <span class="player-name">
+            {{ duel.host()?.username }}@if (duel.isHost()) { (Du) }
+          </span>
+          <span class="score-number">{{ over.hostScore }}</span>
+        </div>
+        <span class="versus">vs</span>
+        <div class="final-player" [class.winner]="over.winner === duel.guest()?.id">
+          <span class="player-name">
+            {{ duel.guest()?.username }}@if (!duel.isHost()) { (Du) }
+          </span>
+          <span class="score-number">{{ over.guestScore }}</span>
+        </div>
+      </div>
+
+      <a class="home-button" routerLink="/multiplayer">Zurück zu den Lobbys</a>
+    </section>
+
+  } @else if (duel.status() === 'waiting') {
+    <section class="quiz-card waiting-card" @fadeIn>
+      <h1>Warte auf einen Gegner...</h1>
+      <p class="subtitle">Deine Lobby ist offen. Sobald jemand beitritt, geht es los.</p>
+      <div class="connecting">
+        <div class="spinner"></div>
+      </div>
+      <button class="cancel-button" type="button" (click)="cancelLobby()">
+        Lobby auflösen
+      </button>
+    </section>
+
+  } @else if (duel.currentQuestion(); as q) {
+    <section
+      class="quiz-card"
+      [@questionSlide]="q.questionIndex"
+      [class.result-correct]="answerFeedback() === 'correct'"
+      [class.result-wrong]="answerFeedback() === 'wrong'"
+    >
+      @if (duel.opponentOffline()) {
+        <div class="offline-banner">
+          Dein Gegner ist offline — er kann sich wieder verbinden.
+        </div>
+      }
+
+      <div class="quiz-header">
+        <div class="meta-badge">
+          <span class="label">Frage</span>
+          <strong>{{ q.questionIndex }} / {{ duel.totalQuestions() }}</strong>
+        </div>
+        <div class="meta-badge me">
+          <span class="label">Du</span>
+          <strong>⭐ {{ duel.myScore() }}</strong>
+        </div>
+        <div class="meta-badge">
+          <span class="label">{{ duel.opponent()?.username }}</span>
+          <strong>⭐ {{ duel.opponentScore() }}</strong>
+        </div>
+      </div>
+
+      <div class="time-bar-track" [class.expired]="overtime()">
+        <div class="time-bar" [style.width]="timeBarWidth()"></div>
+      </div>
+
+      <p class="question-text">{{ q.questionText }}</p>
+
+      <div class="answers" [@answerStagger]="q.questionIndex">
+        @for (option of q.options; track option.id; let i = $index) {
+          <button
+            class="answer-button"
+            type="button"
+            [disabled]="answersLocked()"
+            [class.selected]="selectedOptionId() === option.id"
+            [class.correct]="answerFeedback() === 'correct' && option.id === correctAnswerId()"
+            [class.wrong]="answerFeedback() === 'wrong' && option.id === selectedOptionId()"
+            [class.reveal-correct]="answerFeedback() !== null && answerFeedback() !== 'correct' && option.id === correctAnswerId()"
+            (click)="selectAnswer(option.id)"
+          >
+            <span class="answer-letter">{{ 'ABCD'[i] }}</span>
+            <span class="answer-text">{{ option.text }}</span>
+          </button>
+        }
+      </div>
+
+      @if (resultText()) {
+        <p class="result-text" @fadeIn>{{ resultText() }}</p>
+      } @else if (statusHint()) {
+        <p class="status-hint">{{ statusHint() }}</p>
+      }
+    </section>
+
+  } @else {
+    <section class="quiz-card">
+      <div class="connecting">
+        <div class="spinner"></div>
+        <p>Verbinde mit Duell...</p>
+      </div>
+    </section>
+  }
+</main>

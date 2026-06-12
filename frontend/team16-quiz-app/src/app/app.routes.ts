@@ -2,6 +2,8 @@ import { GameMode } from './pages/game-mode/game-mode';
 import { QuizSetup } from './pages/quiz-setup/quiz-setup';
 import { SinglePlayerQuiz } from './pages/single-player-quiz/single-player-quiz';
 import { QuizResult } from './pages/quiz-result/quiz-result';
+import { MultiplayerLobbies } from './pages/multiplayer-lobbies/multiplayer-lobbies';
+import { MultiplayerQuiz } from './pages/multiplayer-quiz/multiplayer-quiz';
 import {Home} from './pages/home/home';
 import {Routes} from '@angular/router';
 import {Login} from './pages/login/login';
@@ -31,6 +33,16 @@ export const routes: Routes = [
   {
     path: 'quiz-result',
     component: QuizResult,
+    canActivate: [authGuard],
+  },
+  {
+    path: 'multiplayer',
+    component: MultiplayerLobbies,
+    canActivate: [authGuard],
+  },
+  {
+    path: 'multiplayer/duel/:lobbyId',
+    component: MultiplayerQuiz,
     canActivate: [authGuard],
   },
   {

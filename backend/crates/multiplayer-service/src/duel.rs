@@ -16,7 +16,8 @@ use tokio::time::{Instant, sleep, sleep_until};
 use uuid::Uuid;
 
 use crate::models::{
-    AnswerOption, DuelResultPayload, Lobby, LobbySettings, PlayerInfo, PostAnswerPayload,
+    AnswerOption, DuelResultPayload, Lobby, LobbySettings, PlayerAnswerResult, PlayerInfo,
+    PostAnswerPayload,
     PreparedQuestion, QuizQuestion, QuizServiceResponse, ServerMsg,
 };
 use crate::{AppState, cache};
@@ -231,15 +232,33 @@ async fn run_duel(state: &AppState, lobby: Lobby, mut events: mpsc::Receiver<Due
         let deadline = sleep(Duration::from_secs(QUESTION_SECONDS));
         tokio::pin!(deadline);
 
-        // First valid answer or the deadline ends the question.
-        let mut outcome: Option<(Uuid, i32, f64)> = None;
+        // Both players may answer (once each) within the window. The question
+        // resolves when the window ends with at least one answer, when both
+        // have answered, or — if the window ran out empty — on the first
+        // answer that eventually arrives ("overtime").
+        let mut window_open = true;
+        let mut host_answer: Option<(i32, f64)> = None;
+        let mut guest_answer: Option<(i32, f64)> = None;
         loop {
-            let event = tokio::select! {
-                _ = &mut deadline => break,
-                ev = events.recv() => match ev {
+            let event = if window_open {
+                tokio::select! {
+                    _ = &mut deadline => {
+                        window_open = false;
+                        if host_answer.is_some() || guest_answer.is_some() {
+                            break;
+                        }
+                        continue; // overtime: wait for the first answer
+                    }
+                    ev = events.recv() => match ev {
+                        Some(ev) => ev,
+                        None => return,
+                    },
+                }
+            } else {
+                match events.recv().await {
                     Some(ev) => ev,
                     None => return,
-                },
+                }
             };
             match event {
                 DuelEvent::Answer {
@@ -251,19 +270,30 @@ async fn run_duel(state: &AppState, lobby: Lobby, mut events: mpsc::Receiver<Due
                     if answered_index != question_index {
                         continue; // stale answer from a previous question
                     }
-                    let player = if user_id == host.info.id {
-                        &mut host
-                    } else if user_id == guest.info.id {
-                        &mut guest
-                    } else {
+                    let is_host = user_id == host.info.id;
+                    if !is_host && user_id != guest.info.id {
                         continue;
-                    };
+                    }
+                    let player = if is_host { &mut host } else { &mut guest };
                     // Keep forwarding the freshest valid token (§2.4).
                     if token != player.token && decode_jwt(&token, &state.jwt_secret).is_ok() {
                         player.token = token;
                     }
-                    outcome = Some((user_id, answer_id, started.elapsed().as_secs_f64()));
-                    break;
+                    let slot = if is_host {
+                        &mut host_answer
+                    } else {
+                        &mut guest_answer
+                    };
+                    if slot.is_some() {
+                        continue; // one answer per player per question
+                    }
+                    *slot = Some((answer_id, started.elapsed().as_secs_f64()));
+                    if !window_open {
+                        break; // overtime ends with the first answer
+                    }
+                    if host_answer.is_some() && guest_answer.is_some() {
+                        break; // both are in, no reason to wait out the clock
+                    }
                 }
                 DuelEvent::Connect {
                     conn_id,
@@ -320,34 +350,14 @@ async fn run_duel(state: &AppState, lobby: Lobby, mut events: mpsc::Receiver<Due
             }
         }
 
-        // Resolve the question and notify both players.
-        let (answered_by, correct) = match outcome {
-            Some((user_id, answer_id, elapsed)) => {
-                let correct = answer_id == question.correct_answer_id;
-                let player = if user_id == host.info.id {
-                    &mut host
-                } else {
-                    &mut guest
-                };
-                player.score += score_delta(correct, elapsed);
-                post_answer_to_scoreboard(
-                    state.clone(),
-                    player.token.clone(),
-                    session_id,
-                    question.question_id,
-                    answer_id,
-                    correct,
-                    elapsed.round() as i32,
-                );
-                (Some(user_id), correct)
-            }
-            None => (None, false),
-        };
+        // Resolve both players' answers and notify everyone.
+        let host_result = resolve_answer(state, session_id, &mut host, host_answer, question);
+        let guest_result = resolve_answer(state, session_id, &mut guest, guest_answer, question);
         let result_msg = ServerMsg::QuestionResult {
             question_index,
-            answered_by,
-            correct,
             correct_answer_id: question.correct_answer_id,
+            host_result,
+            guest_result,
             host_score: host.score,
             guest_score: guest.score,
         };
@@ -374,6 +384,36 @@ async fn run_duel(state: &AppState, lobby: Lobby, mut events: mpsc::Receiver<Due
     guest.send(over_msg);
 
     post_duel_result(state, &host.token, session_id, &host, &guest).await;
+}
+
+/// Applies one player's answer (if any): updates their score, reports the
+/// answer to the scoreboard, and returns the per-player result for the
+/// `QuestionResult` broadcast.
+fn resolve_answer(
+    state: &AppState,
+    session_id: Uuid,
+    player: &mut PlayerConn,
+    answer: Option<(i32, f64)>,
+    question: &PreparedQuestion,
+) -> Option<PlayerAnswerResult> {
+    let (answer_id, elapsed) = answer?;
+    let correct = answer_id == question.correct_answer_id;
+    let score_delta = score_delta(correct, elapsed);
+    player.score += score_delta;
+    post_answer_to_scoreboard(
+        state.clone(),
+        player.token.clone(),
+        session_id,
+        question.question_id,
+        answer_id,
+        correct,
+        elapsed.round() as i32,
+    );
+    Some(PlayerAnswerResult {
+        answer_id,
+        correct,
+        score_delta,
+    })
 }
 
 /// Score for a resolved question: `100 * (1 / seconds)` for a correct answer,

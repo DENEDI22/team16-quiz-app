@@ -6,6 +6,8 @@ use uuid::Uuid;
 #[serde(rename_all = "camelCase")]
 pub struct Lobby {
     pub id: Uuid,
+    /// Display name so players can recognize a friend's lobby in the list.
+    pub name: String,
     pub host: PlayerInfo,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub guest: Option<PlayerInfo>,
@@ -18,7 +20,9 @@ pub struct Lobby {
 #[serde(rename_all = "camelCase")]
 pub struct PlayerInfo {
     pub id: Uuid,
-    pub email: String,
+    /// Public display name from the JWT; never expose the email here —
+    /// lobbies and duel messages are visible to other users.
+    pub username: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -39,6 +43,7 @@ pub enum LobbyStatus {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateLobbyRequest {
+    pub name: String,
     pub difficulty: String,
     pub categories: Vec<String>,
     pub question_count: u32,
@@ -82,13 +87,16 @@ pub enum ServerMsg {
         question_text: String,
         options: Vec<AnswerOption>,
     },
-    /// Ends a question for both players: either someone answered
-    /// (`answered_by` is set) or the 5-second window ran out (it is null).
+    /// Ends a question for both players. Within the 5-second window each
+    /// player may answer once; the question resolves when the window ends
+    /// (if anyone answered), when both have answered, or — if the window
+    /// ran out with no answers — as soon as the first answer arrives.
     QuestionResult {
         question_index: usize,
-        answered_by: Option<Uuid>,
-        correct: bool,
         correct_answer_id: i32,
+        /// `None` = this player did not answer.
+        host_result: Option<PlayerAnswerResult>,
+        guest_result: Option<PlayerAnswerResult>,
         host_score: i32,
         guest_score: i32,
     },
@@ -114,6 +122,14 @@ pub enum ServerMsg {
     Error {
         message: String,
     },
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlayerAnswerResult {
+    pub answer_id: i32,
+    pub correct: bool,
+    pub score_delta: i32,
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -79,7 +79,7 @@ async fn join_lobby(
 ) -> impl IntoResponse {
     let guest = PlayerInfo {
         id: claims.id,
-        email: claims.email,
+        username: display_name(&claims),
     };
     let mut redis = state.redis.clone();
     match cache::join_lobby(&mut redis, id, &guest).await {
@@ -119,9 +119,13 @@ async fn create_lobby(
     if !(10..=50).contains(&request.question_count) {
         return bad_request("questionCount must be between 10 and 50");
     }
+    let name = request.name.trim().to_string();
+    if name.is_empty() || name.chars().count() > 40 {
+        return bad_request("name must be 1-40 characters");
+    }
     let player = PlayerInfo {
         id: claims.id,
-        email: claims.email,
+        username: display_name(&claims),
     };
     let settings = LobbySettings {
         difficulty: request.difficulty,
@@ -130,6 +134,7 @@ async fn create_lobby(
     };
     let lobby = Lobby {
         id: Uuid::new_v4(),
+        name,
         host: player,
         guest: None,
         settings: settings,
@@ -151,6 +156,16 @@ async fn get_lobbies_handler(State(state): State<AppState>) -> impl IntoResponse
     match get_open_lobbies(&mut redis).await {
         Ok(lobbies) => ok_json(json!(lobbies)),
         Err(e) => server_error(&e.to_string(), &e.to_string()),
+    }
+}
+
+/// Display name shown to other players. Tokens minted before the username
+/// claim existed decode with an empty string; never fall back to the email.
+pub fn display_name(claims: &Claims) -> String {
+    if claims.username.trim().is_empty() {
+        "Spieler".to_string()
+    } else {
+        claims.username.clone()
     }
 }
 

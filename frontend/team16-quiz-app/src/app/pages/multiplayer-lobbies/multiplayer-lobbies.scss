@@ -1,0 +1,193 @@
+.lobbies-page {
+  min-height: 100vh;
+  background: #060b2d;
+  color: white;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 5rem 1.5rem 2rem;
+  position: relative;
+}
+
+.logo-link {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  width: 134px;
+
+  img {
+    width: 100%;
+    display: block;
+  }
+}
+
+.lobbies-card {
+  width: 100%;
+  max-width: 720px;
+  padding: 2rem 2.5rem;
+  border-radius: 20px;
+  background: rgba(8, 17, 58, 0.88);
+  border: 1px solid rgba(128, 232, 255, 0.18);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.42);
+}
+
+.lobbies-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.6rem;
+
+  h1 {
+    margin: 0 0 0.3rem;
+    font-size: 1.7rem;
+    font-weight: 900;
+  }
+
+  .subtitle {
+    margin: 0;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.95rem;
+  }
+}
+
+.error-message {
+  padding: 0.6rem 1rem;
+  border-radius: 10px;
+  background: rgba(248, 113, 113, 0.14);
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  color: #f87171;
+  font-weight: 600;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 2.5rem 0;
+  color: rgba(255, 255, 255, 0.65);
+
+  p {
+    margin: 0 0 0.4rem;
+    font-size: 1.05rem;
+  }
+
+  .hint {
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 0.9rem;
+  }
+}
+
+.lobby-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.lobby-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1.1rem;
+  border-radius: 14px;
+  border: 1px solid rgba(128, 232, 255, 0.22);
+  background: rgba(255, 255, 255, 0.05);
+  transition: border-color 0.18s ease, background 0.18s ease;
+
+  &:hover {
+    border-color: #ffce63;
+    background: rgba(255, 206, 99, 0.07);
+  }
+}
+
+.lobby-info {
+  min-width: 0;
+}
+
+.lobby-name {
+  display: block;
+  font-size: 1.05rem;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lobby-host {
+  display: block;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 0.1rem 0 0.45rem;
+}
+
+.lobby-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.tag {
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: rgba(128, 232, 255, 0.08);
+  border: 1px solid rgba(128, 232, 255, 0.22);
+  color: #80e8ff;
+}
+
+.back-link {
+  display: inline-block;
+  margin-top: 1.6rem;
+  color: rgba(255, 255, 255, 0.55);
+  text-decoration: none;
+  font-size: 0.9rem;
+
+  &:hover {
+    color: #80e8ff;
+  }
+}
+
+.connecting {
+  text-align: center;
+  padding: 2rem 0;
+  color: rgba(255, 255, 255, 0.5);
+
+  .spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid rgba(128, 232, 255, 0.15);
+    border-top-color: #80e8ff;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 1rem;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 680px) {
+  .lobbies-card {
+    padding: 1.5rem;
+  }
+
+  .lobbies-header {
+    flex-direction: column;
+  }
+
+  .lobby-row {
+    flex-direction: column;
+    align-items: stretch;
+
+    button {
+      width: 100%;
+    }
+  }
+}

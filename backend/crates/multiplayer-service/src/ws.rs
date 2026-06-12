@@ -104,7 +104,7 @@ async fn wait_for_hello(socket: &mut WebSocket, state: &AppState) -> Option<(Pla
                 Ok(claims) => {
                     let player = PlayerInfo {
                         id: claims.id,
-                        email: claims.email,
+                        username: crate::display_name(&claims),
                     };
                     return Some((player, token));
                 }

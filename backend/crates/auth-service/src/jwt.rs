@@ -46,6 +46,7 @@ pub fn get_jwt(user: User, secret: String) -> Result<String, String> {
         &Claims {
             id: user.id,
             email: user.email,
+            username: user.username,
             role: user_role,
             exp: (Utc::now() + Duration::minutes(TOKEN_TTL_MINUTES)).timestamp(),
         },
