@@ -146,7 +146,7 @@ where
             .and_then(|value| value.split(' ').nth(1));
 
         match access_token {
-            Some(token) => match decode_jwt(token, var("JWT_SECRET").unwrap()) {
+            Some(token) => match decode_jwt(token, &var("JWT_SECRET").unwrap()) {
                 Ok(claims) => Ok(Auth(claims)),
                 Err(e) => Err(unauthorized(&e)),
             },
