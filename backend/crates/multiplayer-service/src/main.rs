@@ -5,8 +5,7 @@ use std::env::var;
 
 use axum::{
     Json, Router,
-    body::Body,
-    extract::{FromRequestParts, State},
+    extract::{FromRequestParts, Path, State},
     http::{Response, request::Parts},
     response::IntoResponse,
     routing::{delete, get, post},
@@ -19,7 +18,10 @@ use tokio::net::TcpListener;
 use tower_http::cors::CorsLayer;
 use uuid::Uuid;
 
-use crate::models::{CreateLobbyRequest, Lobby, LobbySettings, PlayerInfo};
+use crate::{
+    cache::{get_lobby_by_key, get_open_lobbies},
+    models::{CreateLobbyRequest, Lobby, LobbySettings, PlayerInfo},
+};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -49,9 +51,9 @@ async fn main() {
     let app = Router::new()
         .route("/health", get(health))
         .route("/lobbies", get(get_lobbies_handler))
-        .route("/lobbies", post(create_lobby))
-        .route("/lobbies", delete(delete_lobby))
-        .route("/join", post(join_lobby))
+        .route("/lobbies/", post(create_lobby))
+        .route("/lobbies/{id}", delete(delete_lobby))
+        .route("/lobbies/{id}/join", post(join_lobby))
         .layer(CorsLayer::permissive())
         .with_state(state);
 
@@ -65,7 +67,25 @@ async fn main() {
 }
 async fn join_lobby(State(state): State<AppState>) {}
 
-async fn delete_lobby(State(state): State<AppState>) {}
+async fn delete_lobby(
+    Auth(claims): Auth,
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
+    let mut redis = state.redis.clone();
+    let lobby = match get_lobby_by_key(&mut redis, id).await {
+        Ok(Some(lobby)) => lobby,
+        Ok(None) => return not_found("Lobby does not exist or has expired"),
+        Err(e) => return server_error("Error deleting the lobby", &e.to_string()),
+    };
+    if lobby.host.id != claims.id {
+        return forbidden("Only the host can delete the lobby");
+    }
+    match crate::cache::delete_lobby(&mut redis, id).await {
+        Ok(()) => ok_json(json!({"status": "success"})),
+        Err(e) => server_error("Error deleting the lobby", &e.to_string()),
+    }
+}
 
 async fn create_lobby(
     State(state): State<AppState>,
@@ -91,13 +111,20 @@ async fn create_lobby(
     let mut redis = state.redis.clone();
     match cache::create_open_lobby(&mut redis, &lobby).await {
         Ok(()) => {
-            return ok_json(json!(lobby));
+            return created(json!(lobby));
         }
-        Err(_) => return server_error("Internal error creating the lobby"),
+        Err(e) => return server_error("Internal error creating the lobby", &e.to_string()),
     };
 }
 
-async fn get_lobbies_handler(State(state): State<AppState>) {}
+async fn get_lobbies_handler(State(state): State<AppState>) -> impl IntoResponse {
+    let mut redis = state.redis.clone();
+
+    match get_open_lobbies(&mut redis).await {
+        Ok(lobbies) => ok_json(json!(lobbies)),
+        Err(e) => server_error(&e.to_string(), &e.to_string()),
+    }
+}
 
 async fn health() -> impl IntoResponse {
     Json(json!({ "status": "healthy" }))
@@ -148,11 +175,19 @@ fn not_found(msg: &str) -> Response<String> {
     json_response(404, json!({ "status": "error", "message": msg }))
 }
 
+fn forbidden(msg: &str) -> Response<String> {
+    json_response(403, json!({ "status": "error", "message": msg }))
+}
+
 fn unauthorized(msg: &str) -> Response<String> {
     json_response(401, json!({ "status": "error", "message": msg }))
 }
 
-fn server_error(msg: &str) -> Response<String> {
-    tracing::error!("internal error: {}", msg);
+fn server_error(msg: &str, error: &str) -> Response<String> {
+    tracing::error!("internal error: {}", error);
     json_response(500, json!({ "status": "error", "message": msg }))
+}
+
+fn bad_request(msg: &str) -> Response<String> {
+    json_response(400, json!({"status": "error", "message": msg }))
 }

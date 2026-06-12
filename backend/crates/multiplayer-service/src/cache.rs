@@ -41,3 +41,20 @@ pub async fn create_open_lobby(manager: &mut ConnectionManager, lobby: &Lobby) -
 
     Ok(())
 }
+
+pub async fn get_lobby_by_key(
+    manager: &mut ConnectionManager,
+    id: Uuid,
+) -> RedisResult<Option<Lobby>> {
+    let raw: Option<String> = manager.get(format!("lobby:{id}")).await?;
+    Ok(raw.and_then(|json| serde_json::from_str(&json).ok()))
+}
+
+/// Removes the lobby blob and its entry in the open set — the exact mirror
+/// of create_open_lobby.
+pub async fn delete_lobby(manager: &mut ConnectionManager, id: Uuid) -> RedisResult<()> {
+    let id = id.to_string();
+    let _: () = manager.del(format!("lobby:{id}")).await?;
+    let _: () = manager.srem("lobbies:open", id).await?;
+    Ok(())
+}
