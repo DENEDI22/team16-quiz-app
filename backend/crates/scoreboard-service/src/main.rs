@@ -13,6 +13,7 @@ use axum::{
 };
 use dotenvy::dotenv;
 use serde::Deserialize;
+use tower_http::cors::CorsLayer;
 use serde_json::json;
 use shared::auth::{Auth, JwtSecret};
 use shared::respond;
@@ -20,7 +21,10 @@ use sqlx::PgPool;
 use tokio::{self, net::TcpListener};
 use uuid::Uuid;
 
-use crate::db::{get_question_stats, get_user_duels, insert_answer, insert_duel_result, migrate};
+use crate::db::{
+    get_answer_history, get_highscores, get_question_stats, get_user_duels, insert_answer,
+    insert_duel_result, migrate,
+};
 use crate::models::{CreateAnswerRequest, CreateDuelResultRequest};
 
 #[derive(Clone)]
@@ -67,6 +71,9 @@ async fn main() {
         .route("/duel-results", post(post_duel_results))
         .route("/user-duels", get(user_duels))
         .route("/question-stats", get(question_stats))
+        .route("/highscores", get(highscores))
+        .route("/answer-history", get(answer_history))
+        .layer(CorsLayer::permissive())
         .with_state(state);
 
     // listen globally on port 3000
@@ -126,6 +133,23 @@ async fn question_stats(
             StatusCode::NOT_FOUND,
             "No answers recorded for this question",
         ),
+        Err(e) => server_error(&e.to_string()),
+    }
+}
+
+async fn highscores(State(state): State<AppState>) -> Response<String> {
+    match get_highscores(&state.pool).await {
+        Ok(scores) => respond::ok(json!(scores)),
+        Err(e) => server_error(&e.to_string()),
+    }
+}
+
+async fn answer_history(
+    Auth(claims): Auth,
+    State(state): State<AppState>,
+) -> Response<String> {
+    match get_answer_history(&state.pool, claims.id).await {
+        Ok(history) => respond::ok(json!(history)),
         Err(e) => server_error(&e.to_string()),
     }
 }
