@@ -10,6 +10,11 @@ services:
     volumes:
       - ./db-data/:/var/lib/postgresql/
 
+  redis:
+    image: "redis:7-alpine"
+    ports:
+      - 6379:6379
+
   auth:
     build:
       context: ./backend/
