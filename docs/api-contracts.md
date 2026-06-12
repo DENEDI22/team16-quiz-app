@@ -12,7 +12,7 @@ Services (host ports as mapped in `docker-compose.yaml`):
 | auth-service | 3000 | 3000 | — |
 | quiz-service | 3000 | 4000 | OpenTDB (external) |
 | scoreboard-service | 3000 | 5000 | — |
-| singleplayer-service | 3000 | 6000 | quiz-service, scoreboard-service |
+| singleplayer-service | 3000 | 7000 | quiz-service, scoreboard-service |
 
 ---
 
@@ -226,7 +226,7 @@ Triggers a manual OpenTDB scrape. `200`
 
 ## 5. scoreboard-service
 
-All endpoints require auth (§2.1).
+All endpoints require auth (§2.1) **unless noted otherwise**.
 
 ### POST /post-answer — auth
 
@@ -291,6 +291,47 @@ Response: `201` `{ "success": true, "data": { "duelId": "<uuid>" } }`
 
 `404` if no answers recorded. `answerId`/`correctAnswerId` are integers.
 
+### GET /highscores — **no auth**
+
+Returns the top 20 users ranked by number of correct answers across all recorded answers.
+
+```jsonc
+// 200
+{
+  "success": true,
+  "data": [
+    { "userId": "<uuid>", "totalAnswers": 80, "correctAnswers": 65 },
+    { "userId": "<uuid>", "totalAnswers": 50, "correctAnswers": 40 }
+  ]
+}
+```
+
+The list is ordered by `correctAnswers` descending. Users with no recorded answers are not included.
+
+### GET /answer-history — auth
+
+Returns the last 100 answers of the **authenticated** user, ordered by timestamp descending.
+The `userId` is taken from the JWT; it does not appear as a query parameter.
+
+```jsonc
+// 200
+{
+  "success": true,
+  "data": [
+    {
+      "id": "<uuid>",
+      "question": "<uuid>",
+      "answerId": 3,
+      "isCorrect": true,
+      "timestamp": "2026-06-11T14:30:00Z",
+      "timeToAnswerSeconds": 4,
+      "isMultiplayer": false,
+      "sessionId": "<uuid>"
+    }
+  ]
+}
+```
+
 ---
 
 ## 6. singleplayer-service (WebSocket)
@@ -304,7 +345,7 @@ URL fix the session's game settings **at the moment the socket opens**
 | `categories` | comma-separated category names, forwarded verbatim to quiz-service (§4) |
 | `difficulty` | `easy` \| `medium` \| `hard` |
 
-Example: `ws://localhost:6000/ws?categories=Science%3A%20Computers,History&difficulty=easy`
+Example: `ws://localhost:7000/ws?categories=Science%3A%20Computers,History&difficulty=easy`
 
 All messages are JSON with a `type` tag.
 

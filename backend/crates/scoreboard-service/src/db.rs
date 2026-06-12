@@ -1,7 +1,10 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::models::{CreateAnswerRequest, CreateDuelResultRequest, DuelResults, QuestionStats};
+use crate::models::{
+    AnswerHistoryEntry, CreateAnswerRequest, CreateDuelResultRequest, DuelResults, QuestionStats,
+    UserHighscore,
+};
 use crate::stats::build_question_stats;
 
 pub async fn migrate(pool: &PgPool) -> Result<(), sqlx::Error> {
@@ -97,6 +100,36 @@ pub async fn get_user_duels(pool: &PgPool, user_id: Uuid) -> Result<Vec<DuelResu
          FROM duel_results
          WHERE host_user_id = $1 OR guest_user_id = $1
          ORDER BY timestamp DESC",
+    )
+    .bind(user_id)
+    .fetch_all(pool)
+    .await
+}
+
+pub async fn get_highscores(pool: &PgPool) -> Result<Vec<UserHighscore>, sqlx::Error> {
+    sqlx::query_as::<_, UserHighscore>(
+        "SELECT user_id,
+                COUNT(*) AS total_answers,
+                SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) AS correct_answers
+         FROM answers
+         GROUP BY user_id
+         ORDER BY correct_answers DESC
+         LIMIT 20",
+    )
+    .fetch_all(pool)
+    .await
+}
+
+pub async fn get_answer_history(
+    pool: &PgPool,
+    user_id: Uuid,
+) -> Result<Vec<AnswerHistoryEntry>, sqlx::Error> {
+    sqlx::query_as::<_, AnswerHistoryEntry>(
+        "SELECT id, question, answer_id, is_correct, timestamp, time_to_answer, is_multiplayer, session_id
+         FROM answers
+         WHERE user_id = $1
+         ORDER BY timestamp DESC
+         LIMIT 100",
     )
     .bind(user_id)
     .fetch_all(pool)
