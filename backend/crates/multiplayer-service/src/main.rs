@@ -1,5 +1,7 @@
 mod cache;
+mod duel;
 mod models;
+mod ws;
 
 use std::env::var;
 
@@ -29,6 +31,8 @@ pub struct AppState {
     pub quiz_service_url: String,
     pub scoreboard_service_url: String,
     pub redis: ConnectionManager,
+    pub jwt_secret: String,
+    pub duels: duel::DuelRegistry,
 }
 #[tokio::main]
 async fn main() {
@@ -46,6 +50,8 @@ async fn main() {
         redis: ConnectionManager::new(Client::open(redis_url).expect("Connection to redis failed"))
             .await
             .expect("Error creating connection Manager"),
+        jwt_secret: std::env::var("JWT_SECRET").expect("JWT_SECRET must be set"),
+        duels: duel::DuelRegistry::default(),
     };
 
     let app = Router::new()
@@ -54,6 +60,7 @@ async fn main() {
         .route("/lobbies/", post(create_lobby))
         .route("/lobbies/{id}", delete(delete_lobby))
         .route("/lobbies/{id}/join", post(join_lobby))
+        .route("/duels/{id}/ws", get(ws::ws_upgrade))
         .layer(CorsLayer::permissive())
         .with_state(state);
 
@@ -65,7 +72,24 @@ async fn main() {
         .await
         .expect("Error serving application");
 }
-async fn join_lobby(State(state): State<AppState>) {}
+async fn join_lobby(
+    Auth(claims): Auth,
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
+    let guest = PlayerInfo {
+        id: claims.id,
+        email: claims.email,
+    };
+    let mut redis = state.redis.clone();
+    match cache::join_lobby(&mut redis, id, &guest).await {
+        Ok(lobby) => ok_json(json!(lobby)),
+        Err(cache::JoinError::NotFound) => not_found("Lobby does not exist or has expired"),
+        Err(cache::JoinError::Full) => conflict("Lobby already has a guest"),
+        Err(cache::JoinError::OwnLobby) => conflict("You cannot join your own lobby"),
+        Err(cache::JoinError::Internal(e)) => server_error("Error joining the lobby", &e),
+    }
+}
 
 async fn delete_lobby(
     Auth(claims): Auth,
@@ -92,6 +116,9 @@ async fn create_lobby(
     Auth(claims): Auth,
     Json(request): Json<CreateLobbyRequest>,
 ) -> impl IntoResponse {
+    if !(10..=50).contains(&request.question_count) {
+        return bad_request("questionCount must be between 10 and 50");
+    }
     let player = PlayerInfo {
         id: claims.id,
         email: claims.email,
@@ -99,6 +126,7 @@ async fn create_lobby(
     let settings = LobbySettings {
         difficulty: request.difficulty,
         categories: request.categories,
+        question_count: request.question_count,
     };
     let lobby = Lobby {
         id: Uuid::new_v4(),
@@ -177,6 +205,10 @@ fn not_found(msg: &str) -> Response<String> {
 
 fn forbidden(msg: &str) -> Response<String> {
     json_response(403, json!({ "status": "error", "message": msg }))
+}
+
+fn conflict(msg: &str) -> Response<String> {
+    json_response(409, json!({ "status": "error", "message": msg }))
 }
 
 fn unauthorized(msg: &str) -> Response<String> {
