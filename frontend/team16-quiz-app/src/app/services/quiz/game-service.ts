@@ -1,6 +1,6 @@
 import { inject, Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { Subscription } from 'rxjs';
+import { Subject, Subscription } from 'rxjs';
 import { AnswerResultMsg, GameOverMsg, QuestionMsg, ServerMsg } from '../../models/questions';
 import { AuthService } from '../auth/auth';
 import { WebsocketService } from '../ws/WebsocketService';
@@ -28,6 +28,8 @@ export class GameService {
   gameOver = signal<GameOverMsg | null>(null);
   categories = signal<string[]>([]);
   difficulty = signal<string>('');
+
+  readonly answerResult$ = new Subject<AnswerResultMsg>();
 
   startGame(baseUrl: string, categories: string[], difficulty: string): void {
     this.subscriptions.unsubscribe();
@@ -117,13 +119,16 @@ export class GameService {
         break;
       }
       case 'answer_result':
+        this.answerResult$.next(msg);
         this.lastResult.set(msg);
         this.lives.set(msg.livesRemaining);
         this.score.set(msg.totalScore);
         break;
-      case 'game_over':
-        this.gameOver.set(msg);
+      case 'game_over': {
+        const goDelay = this.lastResult() !== null ? 1300 : 0;
+        setTimeout(() => this.gameOver.set(msg), goDelay);
         break;
+      }
       case 'error':
         if (msg.message.toLowerCase().includes('expired')) {
           this.authService.logout();

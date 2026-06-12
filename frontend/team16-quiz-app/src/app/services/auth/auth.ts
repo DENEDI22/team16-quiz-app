@@ -1,7 +1,8 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { tap } from 'rxjs/operators';
+import { Observable } from 'rxjs';
+import { map, tap } from 'rxjs/operators';
 
 interface RegisterRequest {
   email: string;
@@ -50,6 +51,22 @@ export class AuthService {
     );
   }
 
+  /** Refresht den Token und gibt den neuen Token zurück. Wird vom Interceptor und Timer verwendet. */
+  refreshToken(): Observable<string> {
+    const token = localStorage.getItem('token') ?? '';
+    return this.http
+      .post<{ token: string }>(`${this.apiUrl}/refresh`, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      .pipe(
+        map((res) => res.token),
+        tap((newToken) => {
+          localStorage.setItem('token', newToken);
+          this.scheduleRefresh(newToken);
+        }),
+      );
+  }
+
   isLoggedIn(): boolean {
     return !!localStorage.getItem('token');
   }
@@ -64,7 +81,7 @@ export class AuthService {
     if (this.refreshTimer) clearTimeout(this.refreshTimer);
     try {
       const { exp } = JSON.parse(atob(token.split('.')[1]));
-      const delay = exp * 1000 - Date.now() - 60_000; // 1 min vor Ablauf (zum Testen: z.B. - (14 * 60_000) für sofortigen Trigger)
+      const delay = exp * 1000 - Date.now() - 60_000; // 1 min vor Ablauf
       this.refreshTimer = setTimeout(() => this.doRefresh(), Math.max(delay, 0));
     } catch {
       /* ungültiges Token-Format */
@@ -72,24 +89,11 @@ export class AuthService {
   }
 
   private doRefresh(): void {
-    const token = localStorage.getItem('token') ?? '';
-    this.http
-      .post<{ token: string }>(
-        `${this.apiUrl}/refresh`,
-        {},
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      )
-      .subscribe({
-        next: (res) => {
-          localStorage.setItem('token', res.token);
-          this.scheduleRefresh(res.token);
-        },
-        error: () => {
-          this.logout();
-          this.router.navigate(['/login']);
-        },
-      });
+    this.refreshToken().subscribe({
+      error: () => {
+        this.logout();
+        this.router.navigate(['/login']);
+      },
+    });
   }
 }

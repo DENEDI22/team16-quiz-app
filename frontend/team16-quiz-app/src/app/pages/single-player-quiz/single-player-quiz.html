@@ -65,8 +65,9 @@
             type="button"
             [disabled]="selectedOptionId() !== null"
             [class.selected]="selectedOptionId() === option.id"
-            [class.correct]="gameService.lastResult() !== null && option.id === gameService.lastResult()!.correctAnswerId"
-            [class.wrong]="gameService.lastResult() !== null && selectedOptionId() === option.id && !gameService.lastResult()!.correct"
+            [class.correct]="answerFeedback() === 'correct' && option.id === correctAnswerId()"
+            [class.wrong]="answerFeedback() === 'wrong' && option.id === selectedOptionId()"
+            [class.reveal-correct]="answerFeedback() === 'wrong' && option.id === correctAnswerId()"
             (click)="selectAnswer(option.id)"
           >
             <span class="answer-letter">{{ 'ABCD'[i] }}</span>
