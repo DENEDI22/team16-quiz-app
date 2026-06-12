@@ -1,4 +1,4 @@
-import {Component, signal} from '@angular/core';
+import {Component, inject, signal} from '@angular/core';
 import {ReactiveFormsModule, FormBuilder, Validators} from '@angular/forms';
 import {RouterLink} from '@angular/router';
 import {MatCardModule} from '@angular/material/card';
@@ -6,6 +6,8 @@ import {MatFormFieldModule} from '@angular/material/form-field';
 import {MatInputModule} from '@angular/material/input';
 import {MatButtonModule} from '@angular/material/button';
 import {MatProgressSpinnerModule} from '@angular/material/progress-spinner';
+import {AuthService} from '../../services/auth/auth';
+import {Router} from '@angular/router';
 
 @Component({
   selector: 'app-register',
@@ -26,8 +28,9 @@ export class Register {
   isLoading = signal(false);
   errorMessage = signal('');
   successMessage = signal('');
-
+  private authService = inject(AuthService);
   registerForm;
+  private router = inject(Router);
 
   constructor(private fb: FormBuilder) {
     this.registerForm = this.fb.group({
@@ -48,10 +51,32 @@ export class Register {
 
     this.isLoading.set(true);
 
-    // Später kommt hier API-Call rein
-    console.log(this.registerForm.value);
+    const formValue = this.registerForm.getRawValue();
 
-    this.successMessage.set('Registrierung vorbereitet.');
-    this.isLoading.set(false);
+    this.authService.register({
+      username: formValue.username!,
+      email: formValue.email!,
+      password: formValue.password!,
+    }).subscribe({
+      next: (response) => {
+        this.isLoading.set(false);
+
+        const token = response.data?.token;
+
+        if (token) {
+          localStorage.setItem('token', token);
+        }
+        this.successMessage.set('Registrierung erfolgreich.');
+        this.router.navigate(['/game-mode']);
+      },
+      error: (error) => {
+        this.isLoading.set(false);
+
+        const message =
+          error.error?.data?.message || 'Registrierung fehlgeschlagen.';
+
+        this.errorMessage.set(message);
+      }
+    });
   }
 }

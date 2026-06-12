@@ -20,3 +20,5 @@ target
 .claude/
 db-data/
 **/*.env
+
+node_modules/

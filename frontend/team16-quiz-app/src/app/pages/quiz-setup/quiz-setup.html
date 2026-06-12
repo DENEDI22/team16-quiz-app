@@ -1,0 +1,52 @@
+<main class="setup-page">
+
+  <a class="logo-link" routerLink="/">
+    <img
+      src="/assets/images/quiz-logo-clean.png"
+      alt="Team16 Quiz Logo"
+    />
+  </a>
+
+  <section class="setup-card">
+
+    <h1>Quiz vorbereiten</h1>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Kategorien</mat-label>
+
+      <mat-select [(ngModel)]="categories" multiple>
+
+        <mat-option value="All" (click)="toggleAllCategories()">Alle</mat-option>
+
+        @for (cat of categoryOptions; track cat.value) {
+          <mat-option [value]="cat.value">{{ cat.label }}</mat-option>
+        }
+
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Schwierigkeit</mat-label>
+
+      <mat-select [(ngModel)]="difficulty">
+
+        @for (diff of difficultyOptions; track diff.value) {
+          <mat-option [value]="diff.value">{{ diff.label }}</mat-option>
+        }
+
+      </mat-select>
+    </mat-form-field>
+
+    <button
+      class="start-button"
+      mat-raised-button
+      color="primary"
+      [disabled]="categories.length === 0 || !difficulty"
+      (click)="startQuiz()"
+    >
+      Quiz starten
+    </button>
+
+  </section>
+
+</main>
