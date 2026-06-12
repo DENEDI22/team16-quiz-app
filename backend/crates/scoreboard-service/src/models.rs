@@ -81,3 +81,25 @@ pub enum QuestionType {
     Multiple,
     TrueFalse,
 }
+
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct UserHighscore {
+    pub user_id: Uuid,
+    pub total_answers: i64,
+    pub correct_answers: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct AnswerHistoryEntry {
+    pub id: Uuid,
+    pub question: Uuid,
+    pub answer_id: i32,
+    pub is_correct: bool,
+    pub timestamp: DateTime<Utc>,
+    #[sqlx(rename = "time_to_answer")]
+    pub time_to_answer_seconds: i32,
+    pub is_multiplayer: bool,
+    pub session_id: Uuid,
+}
