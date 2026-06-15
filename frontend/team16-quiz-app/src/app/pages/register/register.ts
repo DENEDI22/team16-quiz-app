@@ -1,3 +1,4 @@
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { PrivacyConsentDialog } from './privacy-consent-dialog/privacy-consent-dialog';
 import {Component, inject, signal} from '@angular/core';
@@ -21,6 +22,8 @@ import {Router} from '@angular/router';
     MatInputModule,
     MatButtonModule,
     MatProgressSpinnerModule,
+    MatDialogModule,
+    MatCheckboxModule,
     RouterLink
   ],
   templateUrl: './register.html',
@@ -41,6 +44,7 @@ export class Register {
       username: ['', [Validators.required, Validators.minLength(3)]],
       email: ['', [Validators.required, Validators.email]],
       password: ['', [Validators.required, Validators.minLength(6)]],
+      privacyAccepted: [false, Validators.requiredTrue],
     });
   }
 
@@ -98,7 +102,7 @@ export class Register {
       }
 
 
-      this.registeruser;
+      this.registeruser();
     })
   }
 }

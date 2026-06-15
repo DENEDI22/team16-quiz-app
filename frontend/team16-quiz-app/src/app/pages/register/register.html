@@ -7,7 +7,7 @@
     <mat-card-header>
       <mat-card-title>Account erstellen</mat-card-title>
       <mat-card-subtitle>
-        Registriere dich für die Quiz App
+        Registriere dich f&uuml;r die Quiz App
       </mat-card-subtitle>
     </mat-card-header>
 
@@ -48,7 +48,7 @@
 
           @if (registerForm.get('email')?.hasError('email') &&
           registerForm.get('email')?.touched) {
-            <mat-error>Bitte eine gültige E-Mail eingeben</mat-error>
+            <mat-error>Bitte eine g&uuml;ltige E-Mail eingeben</mat-error>
           }
         </mat-form-field>
 
@@ -80,6 +80,26 @@
           <p class="success-message">{{ successMessage() }}</p>
         }
 
+        <div class="privacy-consent">
+          <mat-checkbox class="privacy-checkbox" formControlName="privacyAccepted">
+            <span class="privacy-copy">
+              Ich akzeptiere
+              <a routerLink="/datenschutz" (click)="$event.stopPropagation()">
+                Datenschutz
+              </a>
+              &amp;
+              <a routerLink="/agb" (click)="$event.stopPropagation()">
+                AGB
+              </a>
+            </span>
+          </mat-checkbox>
+
+          @if (registerForm.get('privacyAccepted')?.hasError('required') &&
+          registerForm.get('privacyAccepted')?.touched) {
+            <p class="privacy-error">Bitte akzeptiere Datenschutz und AGB.</p>
+          }
+        </div>
+
         <button
           mat-raised-button
           color="primary"
@@ -88,7 +108,7 @@
           [disabled]="isLoading() || registerForm.invalid"
         >
           @if (isLoading()) {
-            Registrierung läuft...
+            Registrierung l&auml;uft...
           } @else {
             Registrieren
           }
