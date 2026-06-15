@@ -1,3 +1,5 @@
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { PrivacyConsentDialog } from './privacy-consent-dialog/privacy-consent-dialog';
 import {Component, inject, signal} from '@angular/core';
 import {ReactiveFormsModule, FormBuilder, Validators} from '@angular/forms';
 import {RouterLink} from '@angular/router';
@@ -29,8 +31,10 @@ export class Register {
   errorMessage = signal('');
   successMessage = signal('');
   private authService = inject(AuthService);
+  private dialog = inject(MatDialog);
   registerForm;
   private router = inject(Router);
+  
 
   constructor(private fb: FormBuilder) {
     this.registerForm = this.fb.group({
@@ -40,19 +44,12 @@ export class Register {
     });
   }
 
-  onSubmit() {
-    this.errorMessage.set('');
-    this.successMessage.set('');
 
-    if (this.registerForm.invalid) {
-      this.registerForm.markAllAsTouched();
-      return;
-    }
+  registeruser(){
 
     this.isLoading.set(true);
-
     const formValue = this.registerForm.getRawValue();
-
+  
     this.authService.register({
       username: formValue.username!,
       email: formValue.email!,
@@ -78,5 +75,30 @@ export class Register {
         this.errorMessage.set(message);
       }
     });
+  }
+
+  onSubmit() {
+    this.errorMessage.set('');
+    this.successMessage.set('');
+
+    if (this.registerForm.invalid) {
+      this.registerForm.markAllAsTouched();
+      return;
+    }
+
+    const ref = this.dialog.open(PrivacyConsentDialog, {
+      width: '420px',
+      disableClose: true
+    });
+
+    ref.afterClosed().subscribe((accepted: boolean) => {
+      if(!accepted){
+        this.errorMessage.set("Nutzungsbedingung nicht akzeptiert!")
+        return;
+      }
+
+
+      this.registeruser;
+    })
   }
 }
