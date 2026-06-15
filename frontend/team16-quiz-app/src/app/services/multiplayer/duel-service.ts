@@ -20,7 +20,8 @@ function decodeHtml(html: string): string {
 
 export type DuelStatus = 'connecting' | 'waiting' | 'playing' | 'over';
 
-const QUESTION_SECONDS = 5;
+/** Fallback, falls der Server (noch) kein Fenster meldet. */
+const DEFAULT_ANSWER_GRACE_SECONDS = 5;
 const MAX_RECONNECT_ATTEMPTS = 8;
 
 @Injectable({
@@ -52,8 +53,10 @@ export class DuelService {
   gameOver = signal<DuelGameOverMsg | null>(null);
   opponentOffline = signal(false);
   errorMessage = signal('');
+  /** Schonfrist pro Frage in Sekunden, vom Server gemeldet (game_started/resumed). */
+  answerGraceSeconds = signal(DEFAULT_ANSWER_GRACE_SECONDS);
   /** Verbleibende Antwortzeit der aktuellen Frage in Sekunden (Anzeige). */
-  secondsLeft = signal(QUESTION_SECONDS);
+  secondsLeft = signal(DEFAULT_ANSWER_GRACE_SECONDS);
   /** true, während die Verbindung nach einem Abbruch neu aufgebaut wird. */
   reconnecting = signal(false);
 
@@ -182,6 +185,7 @@ export class DuelService {
         this.host.set(msg.host);
         this.guest.set(msg.guest);
         this.totalQuestions.set(msg.totalQuestions);
+        this.answerGraceSeconds.set(msg.answerGraceSeconds);
         this.status.set('playing');
         break;
 
@@ -191,6 +195,7 @@ export class DuelService {
         this.hostScore.set(msg.hostScore);
         this.guestScore.set(msg.guestScore);
         this.totalQuestions.set(msg.totalQuestions);
+        this.answerGraceSeconds.set(msg.answerGraceSeconds);
         this.status.set('playing');
         break;
 
@@ -201,7 +206,7 @@ export class DuelService {
           options: msg.options.map((o) => ({ ...o, text: decodeHtml(o.text) })),
         };
         // Sofort anzeigen: der Server pausiert selbst zwischen Ergebnis und
-        // nächster Frage, und sein 5-Sekunden-Fenster läuft ab dem Senden.
+        // nächster Frage, und sein Antwortfenster läuft ab dem Senden.
         // Jede Verzögerung hier bringt die Countdown-Anzeige aus dem Takt.
         this.lastResult.set(null);
         this.currentQuestion.set(decoded);
@@ -249,15 +254,16 @@ export class DuelService {
   }
 
   /**
-   * Reine Anzeige-Uhr: das 5-Sekunden-Fenster wird vom Server durchgesetzt;
+   * Reine Anzeige-Uhr: das Antwortfenster wird vom Server durchgesetzt;
    * `question_result` beendet die Frage unabhängig von dieser Anzeige.
    */
   private startCountdown(): void {
     this.stopCountdown();
     const startedAt = Date.now();
-    this.secondsLeft.set(QUESTION_SECONDS);
+    const window = this.answerGraceSeconds();
+    this.secondsLeft.set(window);
     this.countdownTimer = setInterval(() => {
-      const left = QUESTION_SECONDS - (Date.now() - startedAt) / 1000;
+      const left = window - (Date.now() - startedAt) / 1000;
       this.secondsLeft.set(Math.max(left, 0));
       if (left <= 0) this.stopCountdown();
     }, 100);

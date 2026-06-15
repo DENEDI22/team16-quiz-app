@@ -573,3 +573,172 @@ Lifecycle rules:
    the previous token stays in use.
 
 ---
+
+## 7. multiplayer-service
+
+Two-player duels. A **lobby** (REST, backed by Redis) is the pre-game waiting
+room; once both players connect over the **duel WebSocket**, an in-memory actor
+runs the game. All endpoints require auth (§2.1) except `/health`.
+
+### 7.1 Lobby REST
+
+#### GET /lobbies — auth
+
+Lists the currently open (waiting) lobbies. `200` `{ "success": true, "data": [ Lobby, … ] }`.
+
+#### POST /lobbies/ — auth
+
+Creates a lobby owned by the authenticated user (the host comes from the token
+claims, never the body). Note the **trailing slash** in the path.
+
+Request:
+
+```jsonc
+{
+  "name": "Dannys Duell",                 // 1–40 chars after trimming
+  "difficulty": "easy",                   // "easy" | "medium" | "hard"; "" = no filter
+  "categories": ["Science: Computers"],   // exact category names (§4); [] = no filter
+  "questionCount": 20,                    // 10–50
+  "answerGraceSeconds": 15                 // grace window per question, 5–60
+}
+```
+
+Response: `201` with the created **Lobby** (see §7.2) · `400` if any field is
+out of range (`questionCount`, `name` length, or `answerGraceSeconds`).
+
+> `answerGraceSeconds` is the grace window (seconds) after a question appears:
+> a single early answer is locked in (and scored on speed, §7.3) but does **not**
+> advance the round, so a fast click can't cut the opponent off. The round
+> resolves when both have answered or the window elapses with at least one
+> answer in. The same value is sent to clients mid-duel (in `game_started` /
+> `resumed`) so their countdown matches the server, and a duel resumed from a
+> checkpoint keeps the value it was created with.
+
+#### POST /lobbies/{id}/join — auth
+
+Joins an open lobby as the guest. Response: `200` with the updated Lobby ·
+`404` lobby gone/expired · `409` lobby already full **or** it is your own lobby.
+
+#### DELETE /lobbies/{id} — auth, **host only**
+
+`200` `{ "success": true, "data": { "status": "success" } }` · `403` non-host ·
+`404` lobby gone/expired.
+
+### 7.2 Lobby object
+
+```jsonc
+{
+  "id": "<uuid>",
+  "name": "Dannys Duell",
+  "host":  { "id": "<uuid>", "username": "alice" },
+  "guest": { "id": "<uuid>", "username": "bob" },   // omitted while still waiting
+  "settings": {
+    "difficulty": "easy",
+    "categories": ["Science: Computers"],
+    "questionCount": 20,
+    "answerGraceSeconds": 15
+  },
+  "status": "waiting",                               // "waiting" | "full"
+  "createdAt": "2026-06-11T14:30:00Z"
+}
+```
+
+### 7.3 Duel WebSocket — `GET /duels/{id}/ws`
+
+`{id}` is the lobby id. As with singleplayer (§2.4) the browser can't set
+headers, so auth travels in the first message. All messages are JSON tagged with
+`type` (snake_case tags, camelCase fields).
+
+#### Client → server
+
+```jsonc
+{ "type": "hello", "token": "<jwt>" }     // first message on every (re)connect
+
+{
+  "type": "submit_answer",
+  "token": "<jwt>",                        // client's CURRENT token, §2.4
+  "questionIndex": 3,                      // 1-based; must echo the live question
+  "answerId": 2                            // 1-based option index, §1.2
+}
+```
+
+#### Server → client
+
+```jsonc
+{ "type": "waiting" }                      // host connected, waiting for the guest
+
+{
+  "type": "game_started",
+  "sessionId": "<uuid>",
+  "host":  { "id": "<uuid>", "username": "alice" },
+  "guest": { "id": "<uuid>", "username": "bob" },
+  "totalQuestions": 20,
+  "answerGraceSeconds": 15                     // per-question grace window (§7.1)
+}
+
+{
+  "type": "question",
+  "questionIndex": 1,
+  "questionId": "<uuid>",
+  "questionText": "What does CPU stand for?",
+  "options": [ { "id": 1, "text": "…" } /* …, sorted, §1.2 */ ]
+}
+
+{
+  "type": "question_result",
+  "questionIndex": 1,
+  "correctAnswerId": 2,
+  "hostResult":  { "answerId": 2, "correct": true,  "scoreDelta": 100 }, // null = no answer
+  "guestResult": { "answerId": 1, "correct": false, "scoreDelta": 0 },
+  "hostScore": 100,
+  "guestScore": 0
+}
+
+{
+  "type": "resumed",                        // snapshot for a reconnecting player,
+  "sessionId": "<uuid>",                    // immediately followed by a fresh `question`
+  "host":  { "id": "<uuid>", "username": "alice" },
+  "guest": { "id": "<uuid>", "username": "bob" },
+  "hostScore": 100,
+  "guestScore": 0,
+  "questionIndex": 4,
+  "totalQuestions": 20,
+  "answerGraceSeconds": 15
+}
+
+{ "type": "opponent_disconnected" }
+{ "type": "opponent_reconnected" }
+
+{ "type": "game_over", "hostScore": 300, "guestScore": 200, "winner": "<uuid>" } // null = draw
+
+{ "type": "error", "message": "you are not part of this lobby" }
+```
+
+Lifecycle / rules:
+
+1. Each question opens an `answerGraceSeconds`-second grace window. Within it
+   each player may answer **once**, and a single early answer is held — it does
+   not advance the round, so the opponent keeps the rest of the window. The
+   question resolves when both have answered, or when the window ends with at
+   least one answer in; if the window runs out with no answers it stays open and
+   the first answer to arrive resolves it ("overtime"). A short pause follows
+   each `question_result` before the next `question`.
+2. Scoring per correct answer: `round(100 / max(secondsTaken, 1))` (so answers
+   within one second score the full **100**); a wrong or missing answer scores
+   **0**. Higher total wins; equal totals → `winner: null`.
+3. The duel checkpoints to Redis at every question boundary, so a service
+   restart resumes at the in-flight question (it restarts) with scores intact;
+   reconnecting players receive `resumed` + the current `question`.
+
+#### Outbound calls
+
+| Call | Contract | Auth |
+|---|---|---|
+| `GET {QUIZ_SERVICE_URL}/questions?categories=…&difficulty=…` (lobby settings, omitted when unset) | §4 | forward user token |
+| `POST {SCOREBOARD_SERVICE_URL}/post-answer` (per answer, `isMultiplayer: true`) | §5 | forward user token |
+| `POST {SCOREBOARD_SERVICE_URL}/duel-results` (once, at game over) | §5 | forward host token |
+
+Non-2xx responses from these services are logged with status and body; the
+scoreboard calls are fire-and-forget and never interrupt a running duel.
+
+---

@@ -21,7 +21,9 @@ use crate::models::{
 };
 use crate::{AppState, cache};
 
-const QUESTION_SECONDS: u64 = 5;
+/// Fallback answer-grace window when a lobby/checkpoint doesn't specify one
+/// (e.g. an old checkpoint written before the setting existed).
+const DEFAULT_ANSWER_GRACE_SECONDS: u64 = 5;
 /// Pause after each question result so clients can show it.
 const RESULT_PAUSE_SECONDS: u64 = 2;
 /// How long an actor waits for both players before giving up (matches the
@@ -209,17 +211,25 @@ async fn run_duel(state: &AppState, lobby: Lobby, mut events: mpsc::Receiver<Due
 
     let session_id = Uuid::new_v4();
     let total_questions = questions.len();
+    // 0 or negative would make the timer fire instantly; clamp to the default.
+    let answer_grace_seconds = u64::try_from(settings.answer_grace_seconds)
+        .ok()
+        .filter(|&s| s > 0)
+        .unwrap_or(DEFAULT_ANSWER_GRACE_SECONDS);
+
     let started_msg = ServerMsg::GameStarted {
         session_id,
         host: host.info.clone(),
         guest: guest.info.clone(),
         total_questions,
+        answer_grace_seconds,
     };
     host.send(started_msg.clone());
     guest.send(started_msg);
 
     run_game(
         state, lobby_id, events, host, guest, session_id, questions, 0,
+        answer_grace_seconds,
     )
     .await;
 }
@@ -246,6 +256,11 @@ pub async fn resume_task(
     // already queued and the in-game Connect handler sends them Resumed plus
     // the current question. The opponent attaches the same way when they
     // return.
+    let answer_grace_seconds = if checkpoint.answer_grace_seconds > 0 {
+        checkpoint.answer_grace_seconds
+    } else {
+        DEFAULT_ANSWER_GRACE_SECONDS
+    };
     run_game(
         &state,
         lobby_id,
@@ -255,6 +270,7 @@ pub async fn resume_task(
         checkpoint.session_id,
         checkpoint.questions,
         checkpoint.next_index,
+        answer_grace_seconds,
     )
     .await;
     state.duels.lock().unwrap().remove(&lobby_id);
@@ -274,6 +290,7 @@ async fn run_game(
     session_id: Uuid,
     questions: Vec<PreparedQuestion>,
     start_index: usize,
+    answer_grace_seconds: u64,
 ) {
     let total_questions = questions.len();
     let mut redis = state.redis.clone();
@@ -287,6 +304,7 @@ async fn run_game(
         &guest,
         &questions,
         start_index,
+        answer_grace_seconds,
     )
     .await;
 
@@ -305,7 +323,7 @@ async fn run_game(
         guest.send(question_msg.clone());
 
         let started = Instant::now();
-        let deadline = sleep(Duration::from_secs(QUESTION_SECONDS));
+        let deadline = sleep(Duration::from_secs(answer_grace_seconds));
         tokio::pin!(deadline);
 
         // Both players may answer (once each) within the window. The question
@@ -397,6 +415,7 @@ async fn run_game(
                         guest_score: guest.score,
                         question_index,
                         total_questions,
+                        answer_grace_seconds,
                     };
                     let (target, other) = if is_host {
                         (&host, &guest)
@@ -451,6 +470,7 @@ async fn run_game(
             &guest,
             &questions,
             index0 + 1,
+            answer_grace_seconds,
         )
         .await;
 
@@ -488,6 +508,7 @@ async fn save_checkpoint(
     guest: &PlayerConn,
     questions: &[PreparedQuestion],
     next_index: usize,
+    answer_grace_seconds: u64,
 ) {
     let checkpoint = DuelCheckpoint {
         session_id,
@@ -497,6 +518,7 @@ async fn save_checkpoint(
         guest_score: guest.score,
         questions: questions.to_vec(),
         next_index,
+        answer_grace_seconds,
     };
     if let Err(e) = cache::save_duel_checkpoint(redis, lobby_id, &checkpoint).await {
         tracing::warn!("duel {lobby_id}: failed to write checkpoint: {e}");
