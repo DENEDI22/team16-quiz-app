@@ -524,7 +524,9 @@ fn resolve_answer(
         question.question_id,
         answer_id,
         correct,
-        elapsed.round() as i32,
+        (elapsed * 1000.0).round() as i32,
+        question.category.clone(),
+        question.difficulty.clone(),
     );
     Some(PlayerAnswerResult {
         answer_id,
@@ -640,10 +642,13 @@ fn prepare_question(q: QuizQuestion) -> PreparedQuestion {
         question_text: q.question,
         options,
         correct_answer_id,
+        category: q.category,
+        difficulty: q.difficulty,
     }
 }
 
 /// Fire-and-forget: a slow scoreboard must never stall the game loop.
+#[allow(clippy::too_many_arguments)]
 fn post_answer_to_scoreboard(
     state: AppState,
     token: String,
@@ -651,7 +656,9 @@ fn post_answer_to_scoreboard(
     question_id: Uuid,
     answer_id: i32,
     is_correct: bool,
-    time_to_answer_seconds: i32,
+    time_to_answer_ms: i32,
+    category: String,
+    difficulty: String,
 ) {
     tokio::spawn(async move {
         let payload = PostAnswerPayload {
@@ -659,9 +666,11 @@ fn post_answer_to_scoreboard(
             answer_id,
             is_correct,
             timestamp: Utc::now().to_rfc3339(),
-            time_to_answer_seconds,
+            time_to_answer_ms,
             is_multiplayer: true,
             session_id,
+            category,
+            difficulty,
         };
         let result = state
             .http_client
@@ -748,6 +757,8 @@ mod tests {
                 "Computer Personal Unit".to_string(),
                 "Central Processor Unit".to_string(),
             ],
+            category: "Science: Computers".to_string(),
+            difficulty: "easy".to_string(),
         }
     }
 

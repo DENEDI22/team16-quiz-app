@@ -4,6 +4,7 @@
 #   /api/auth/*          -> auth-service:3000          (Prefix wird entfernt)
 #   /api/singleplayer/*  -> singleplayer-service:3000  (Prefix wird entfernt)
 #   /api/multiplayer/*   -> multiplayer-service:3000   (Prefix wird entfernt)
+#   /api/scoreboard/*    -> scoreboard-service:3000    (Prefix wird entfernt)
 #   /*                   -> frontend:80 (nginx, SPA)
 #
 # Die Backends kennen die /api/*-Prefixe nicht — die stripPrefix-Middleware
@@ -20,6 +21,7 @@ spec:
       - /api/auth
       - /api/singleplayer
       - /api/multiplayer
+      - /api/scoreboard
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -52,6 +54,13 @@ spec:
             backend:
               service:
                 name: multiplayer-service
+                port:
+                  number: 3000
+          - path: /api/scoreboard
+            pathType: Prefix
+            backend:
+              service:
+                name: scoreboard-service
                 port:
                   number: 3000
 ---

@@ -48,6 +48,7 @@ services:
     environment:
       DATABASE_URL: postgres://admin:Start123!@db-quiz-app:5432/scoreboard-service
       JWT_SECRET: dev-only-secret
+      AUTH_SERVICE_URL: "http://auth:3000"
     ports:
       - "5000:3000"
     depends_on:

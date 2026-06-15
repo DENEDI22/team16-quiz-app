@@ -11,8 +11,9 @@ Services (host ports as mapped in `docker-compose.yaml`):
 |---|---|---|---|
 | auth-service | 3000 | 3000 | — |
 | quiz-service | 3000 | 4000 | OpenTDB (external) |
-| scoreboard-service | 3000 | 5000 | — |
+| scoreboard-service | 3000 | 5000 | auth-service (username lookup) |
 | singleplayer-service | 3000 | 7000 | quiz-service, scoreboard-service |
+| multiplayer-service | 3000 | 7001 | quiz-service, scoreboard-service, Redis |
 
 ---
 
@@ -46,7 +47,7 @@ question data; no service may shuffle.
 ### 1.3 JSON field naming
 
 All JSON fields are **camelCase** (`questionId`, `incorrectAnswers`,
-`timeToAnswerSeconds`). In Rust: `#[serde(rename_all = "camelCase")]` on every
+`timeToAnswerMs`). In Rust: `#[serde(rename_all = "camelCase")]` on every
 request/response struct.
 
 ### 1.4 Response envelope
@@ -77,8 +78,9 @@ invalid token, `403` valid token but insufficient role, `404` not found,
 
 - Timestamps: RFC 3339 / ISO 8601 strings in UTC, e.g. `"2026-06-11T14:30:00Z"`
   (`chrono::DateTime<Utc>` default serde format).
-- Durations: integer **seconds**, field names suffixed `Seconds`
-  (`timeToAnswerSeconds`). Type: `i32` on the wire and in the DB.
+- Durations: integer **milliseconds**, field names suffixed `Ms`
+  (`timeToAnswerMs`). Type: `i32` on the wire and in the DB. (Changed from
+  seconds — milliseconds give finer-grained stats.)
 
 ---
 
@@ -172,6 +174,24 @@ Responses: `200` `{ "success": true, "data": { "token": "<jwt>" } }` · `401`.
 
 `200` `{ "success": true, "data": { "id": "<uuid>", "email": "…", "role": "User" } }`
 
+### GET /users/usernames?ids=\<uuid,uuid,…\> — auth
+
+Resolves a batch of user ids to their **public** usernames (used by
+scoreboard-service to label leaderboard entries; the email is never returned).
+Any caller with a valid token may use it. Unknown or soft-deleted ids are
+omitted from the result.
+
+```jsonc
+// 200
+{
+  "success": true,
+  "data": [
+    { "id": "<uuid>", "username": "alice" },
+    { "id": "<uuid>", "username": "bob" }
+  ]
+}
+```
+
 ---
 
 ## 4. quiz-service
@@ -241,13 +261,38 @@ Request:
   "answerId": 3,                          // 1-based option index, §1.2
   "isCorrect": true,
   "timestamp": "2026-06-11T14:30:00Z",
-  "timeToAnswerSeconds": 4,
+  "timeToAnswerMs": 4200,                 // milliseconds, §1.6
   "isMultiplayer": false,
-  "sessionId": "<uuid>"
+  "sessionId": "<uuid>",
+  "category": "Science: Computers",       // the question's concrete category
+  "difficulty": "easy"                    // the question's concrete difficulty
 }
 ```
 
+`category`/`difficulty` are the answered **question's** concrete values
+(denormalized so leaderboards can filter without joining quiz-service's DB).
+
 Response: `201` `{ "success": true, "data": { "answerRecordId": "<uuid>" } }`
+
+### POST /singleplayer-result — auth
+
+Records a finished singleplayer game's aggregate score for the **authenticated**
+user (`userId` is taken from the token). `difficulty`/`categories` are the
+**session's** selected settings — a concrete value, or `"All"` when the player
+left them unfiltered (Req 4).
+
+```jsonc
+{
+  "sessionId": "<uuid>",
+  "score": 700,
+  "correctAnswers": 7,
+  "difficulty": "easy",                   // "easy" | "medium" | "hard" | "All"
+  "categories": "Science: Computers",     // selected categories, or "All"
+  "timestamp": "2026-06-11T14:30:00Z"
+}
+```
+
+Response: `201` `{ "success": true, "data": { "singlePlayerResultId": "<uuid>" } }`
 
 ### POST /duel-results — auth
 
@@ -324,9 +369,90 @@ The `userId` is taken from the JWT; it does not appear as a query parameter.
       "answerId": 3,
       "isCorrect": true,
       "timestamp": "2026-06-11T14:30:00Z",
-      "timeToAnswerSeconds": 4,
+      "timeToAnswerMs": 4200,
       "isMultiplayer": false,
-      "sessionId": "<uuid>"
+      "sessionId": "<uuid>",
+      "category": "Science: Computers",
+      "difficulty": "easy"
+    }
+  ]
+}
+```
+
+### GET /account-stats — auth
+
+All personal stats for the account-overview page (Req 1), aggregated
+server-side from the **authenticated** user's records. The frontend only renders
+these values.
+
+```jsonc
+// 200
+{
+  "success": true,
+  "data": {
+    "highscoresPerDifficulty": [          // best singleplayer score per bucket
+      { "difficulty": "easy", "highscore": 900 },
+      { "difficulty": "All",  "highscore": 1200 }
+    ],
+    "lastDuels": [                        // up to 10, newest first
+      {
+        "duelId": "<uuid>", "sessionId": "<uuid>",
+        "opponentId": "<uuid>", "opponentUsername": "bob",
+        "ownScore": 300, "opponentScore": 200,
+        "outcome": "win",                 // "win" | "loss" | "draw"
+        "timestamp": "2026-06-11T14:30:00Z"
+      }
+    ],
+    "avgMultiplayerScore": 240.5,         // mean of the user's own duel scores
+    "duelsPlayed": 12,
+    "avgTimeToAnswerMs": 3820.4,          // mean over all the user's answers
+    "winRate": 0.58                       // wins / duels played (draws ≠ win)
+  }
+}
+```
+
+### GET /leaderboard/duels — auth
+
+Top-10 players by number of duels won (strictly higher score; draws count for
+nobody). Usernames resolved via auth-service.
+
+```jsonc
+// 200
+{ "success": true, "data": [ { "userId": "<uuid>", "username": "alice", "duelsWon": 14 } ] }
+```
+
+### GET /leaderboard/singleplayer — auth
+
+Top-10 singleplayer highscores **per difficulty bucket** (Req 3.2).
+
+```jsonc
+// 200
+{
+  "success": true,
+  "data": [
+    { "difficulty": "easy", "entries": [
+        { "userId": "<uuid>", "username": "alice", "highscore": 1500 }
+    ] },
+    { "difficulty": "All", "entries": [ /* … */ ] }
+  ]
+}
+```
+
+### GET /leaderboard/category?category=\<name\> — auth
+
+Top-10 players by **accuracy** in a specific category (Req 3.3), among those who
+have answered at least 10 questions in it (so a lone 1/1 can't top the ranking).
+Ordered by accuracy desc, then correct count.
+
+```jsonc
+// 200
+{
+  "success": true,
+  "data": [
+    {
+      "userId": "<uuid>", "username": "alice",
+      "totalAnswers": 40, "correctAnswers": 36,
+      "accuracy": 0.9                     // correct / total, 0.0–1.0
     }
   ]
 }
@@ -359,7 +485,7 @@ All messages are JSON with a `type` tag.
   "token": "<jwt>",                 // client's CURRENT token, §2.4
   "questionId": "<uuid>",
   "answerId": 3,                    // integer index, §1.2
-  "timeToAnswerSeconds": 4
+  "timeToAnswerMs": 4200           // milliseconds, §1.6
 }
 ```
 
@@ -412,7 +538,7 @@ sequenceDiagram
         S->>Q: GET /questions?categories&difficulty  (Authorization: Bearer token)
         Q-->>S: 200 { success: true, data: Question }
         S-->>C: question { questionId, questionText, options[4], questionIndex }
-        C->>S: submit_answer { token, questionId, answerId, timeToAnswerSeconds }
+        C->>S: submit_answer { token, questionId, answerId, timeToAnswerMs }
         Note over S: adopt token if fresher & valid,<br/>grade answer locally
         S--)B: POST /post-answer  (Bearer token, async — failures logged)
         S-->>C: answer_result { correct, correctAnswerId, totalScore, livesRemaining }
@@ -433,7 +559,7 @@ Lifecycle rules:
 4. Scoring: correct answer **+100** points; wrong answer **−1 life**. The game
    starts with **3 lives** and ends with `game_over` when they reach 0. There
    is no question limit and no per-question timeout (the client measures
-   `timeToAnswerSeconds` itself).
+   `timeToAnswerMs` itself).
 5. Grading is local: singleplayer compares `answerId` against the canonical
    index (§1.2). The scoreboard POST is fire-and-forget — a scoreboard outage
    never interrupts a running game (failures are logged, not surfaced).

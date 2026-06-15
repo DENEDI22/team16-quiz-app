@@ -153,6 +153,13 @@ pub struct PreparedQuestion {
     pub question_text: String,
     pub options: Vec<AnswerOption>,
     pub correct_answer_id: i32,
+    /// The question's concrete category and difficulty, forwarded to
+    /// scoreboard-service for category/difficulty leaderboards. `#[serde(default)]`
+    /// keeps older Redis checkpoints (written before these fields) loadable.
+    #[serde(default)]
+    pub category: String,
+    #[serde(default)]
+    pub difficulty: String,
 }
 
 /// Resume point for a running duel, written to Redis at every question
@@ -185,6 +192,10 @@ pub struct QuizQuestion {
     pub question: String,
     pub correct_answer: String,
     pub incorrect_answers: Vec<String>,
+    #[serde(default)]
+    pub category: String,
+    #[serde(default)]
+    pub difficulty: String,
 }
 
 /// Body for scoreboard-service's `POST /post-answer`. The user is identified
@@ -196,9 +207,11 @@ pub struct PostAnswerPayload {
     pub answer_id: i32,
     pub is_correct: bool,
     pub timestamp: String,
-    pub time_to_answer_seconds: i32,
+    pub time_to_answer_ms: i32,
     pub is_multiplayer: bool,
     pub session_id: Uuid,
+    pub category: String,
+    pub difficulty: String,
 }
 
 /// Body for scoreboard-service's `POST /duel-results`.

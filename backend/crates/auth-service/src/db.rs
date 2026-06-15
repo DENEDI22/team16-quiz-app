@@ -45,6 +45,23 @@ pub async fn find_user_by_email(pool: &PgPool, email: &str) -> Result<User, sqlx
     .await
 }
 
+/// Resolves a batch of user ids to their public usernames (used by other
+/// services, e.g. scoreboard, to label leaderboard entries). Unknown or
+/// soft-deleted ids are simply omitted from the result.
+pub async fn get_usernames(
+    pool: &PgPool,
+    ids: &[Uuid],
+) -> Result<Vec<(Uuid, String)>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT id, username
+         FROM users
+         WHERE id = ANY($1) AND is_deleted = false",
+    )
+    .bind(ids)
+    .fetch_all(pool)
+    .await
+}
+
 pub async fn create_user(
     pool: &PgPool,
     email: &str,

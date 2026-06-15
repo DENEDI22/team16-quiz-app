@@ -16,8 +16,9 @@ pub enum ClientMsg {
         /// 1-based option index (docs/api-contracts.md §1.2).
         #[serde(rename = "answerId")]
         answer_id: i32,
-        #[serde(rename = "timeToAnswerSeconds")]
-        time_to_answer_seconds: i32,
+        /// Duration in milliseconds (docs/api-contracts.md §1.6).
+        #[serde(rename = "timeToAnswerMs")]
+        time_to_answer_ms: i32,
     },
 }
 
@@ -72,6 +73,10 @@ pub struct PreparedQuestion {
     pub question_text: String,
     pub options: Vec<AnswerOption>,
     pub correct_answer_id: i32,
+    /// The question's concrete category and difficulty, forwarded to
+    /// scoreboard-service so it can build category/difficulty leaderboards.
+    pub category: String,
+    pub difficulty: String,
 }
 
 /// quiz-service's `{ "success": true, "data": … }` envelope around a question.
@@ -87,6 +92,10 @@ pub struct QuizQuestion {
     pub question: String,
     pub correct_answer: String,
     pub incorrect_answers: Vec<String>,
+    #[serde(default)]
+    pub category: String,
+    #[serde(default)]
+    pub difficulty: String,
 }
 
 /// Body for scoreboard-service's `POST /post-answer`. The user is identified by
@@ -98,7 +107,24 @@ pub struct PostAnswerPayload {
     pub answer_id: i32,
     pub is_correct: bool,
     pub timestamp: String,
-    pub time_to_answer_seconds: i32,
+    pub time_to_answer_ms: i32,
     pub is_multiplayer: bool,
     pub session_id: Uuid,
+    pub category: String,
+    pub difficulty: String,
+}
+
+/// Body for scoreboard-service's `POST /singleplayer-result`, sent once at game
+/// over. The user is identified by the forwarded bearer token.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SinglePlayerResultPayload {
+    pub session_id: Uuid,
+    pub score: i32,
+    pub correct_answers: i32,
+    /// The session's selected difficulty bucket, or `All`.
+    pub difficulty: String,
+    /// The session's selected categories, or `All`.
+    pub categories: String,
+    pub timestamp: String,
 }

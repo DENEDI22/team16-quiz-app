@@ -74,14 +74,14 @@ export class GameService {
     const question = this.currentQuestion();
     if (!question) return;
     const token = localStorage.getItem('token') ?? '';
-    const elapsed = Math.floor((Date.now() - this.questionStartTime) / 1000);
+    const elapsedMs = Date.now() - this.questionStartTime;
     this.websocket.send(
       JSON.stringify({
         type: 'submit_answer',
         token,
         questionId: question.questionId,
         answerId,
-        timeToAnswerSeconds: elapsed,
+        timeToAnswerMs: elapsedMs,
       }),
     );
   }

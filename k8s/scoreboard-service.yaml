@@ -36,6 +36,8 @@ spec:
                 secretKeyRef:
                   name: quiz-app-secrets
                   key: JWT_SECRET
+            - name: AUTH_SERVICE_URL
+              value: http://auth-service:3000
           readinessProbe:
             httpGet:
               path: /health
