@@ -1,0 +1,91 @@
+# Die Services legen ihre Tabellen selbst an (sqlx migrate), erwarten aber,
+# dass ihre Datenbanken existieren. Das Init-Skript läuft nur beim ersten
+# Start mit leerem Volume.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  namespace: quiz-app
+data:
+  01-create-databases.sql: |
+    CREATE DATABASE "quiz-auth";
+    CREATE DATABASE "quiz-service";
+    CREATE DATABASE "scoreboard-service";
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data
+  namespace: quiz-app
+spec:
+  # k3s bringt die StorageClass "local-path" als Default mit.
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: quiz-app
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # RWO-Volume: alte Instanz muss weg, bevor die neue startet
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: quiz-app-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: quiz-app-secrets
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              value: default_database
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U $POSTGRES_USER"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: postgres-data
+        - name: init
+          configMap:
+            name: postgres-init
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: quiz-app
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432

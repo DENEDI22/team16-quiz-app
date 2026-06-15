@@ -1,0 +1,16 @@
+{
+  "/api/auth": {
+    "target": "http://localhost:3000",
+    "pathRewrite": { "^/api/auth": "" }
+  },
+  "/api/singleplayer": {
+    "target": "http://localhost:7000",
+    "ws": true,
+    "pathRewrite": { "^/api/singleplayer": "" }
+  },
+  "/api/multiplayer": {
+    "target": "http://localhost:7001",
+    "ws": true,
+    "pathRewrite": { "^/api/multiplayer": "" }
+  }
+}

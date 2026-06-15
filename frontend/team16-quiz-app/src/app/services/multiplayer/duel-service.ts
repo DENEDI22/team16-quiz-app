@@ -10,7 +10,7 @@ import {
 } from '../../models/lobby';
 import { AuthService } from '../auth/auth';
 import { WebsocketService } from '../ws/WebsocketService';
-import { MULTIPLAYER_WS_URL } from './lobby-service';
+import { wsUrl } from '../../core/ws-url';
 
 function decodeHtml(html: string): string {
   const txt = document.createElement('textarea');
@@ -87,7 +87,7 @@ export class DuelService {
     this.gameOverReceived = false;
     this.reconnectAttempts = 0;
     this.reconnecting.set(false);
-    this.wsUrl = `${MULTIPLAYER_WS_URL}/duels/${lobbyId}/ws`;
+    this.wsUrl = wsUrl(`/api/multiplayer/duels/${lobbyId}/ws`);
 
     this.status.set('connecting');
     this.host.set(null);

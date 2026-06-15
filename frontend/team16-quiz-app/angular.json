@@ -58,6 +58,10 @@
         },
         "serve": {
           "builder": "@angular/build:dev-server",
+          "options": {
+            "proxyConfig": "proxy.conf.json",
+            "allowedHosts": ["pluckily-harbourless-zayne.ngrok-free.dev"]
+          },
           "configurations": {
             "production": {
               "buildTarget": "team16-quiz-app:build:production"
@@ -69,7 +73,10 @@
           "defaultConfiguration": "development"
         },
         "test": {
-          "builder": "@angular/build:unit-test"
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "setupFiles": ["src/test-setup.ts"]
+          }
         }
       }
     }

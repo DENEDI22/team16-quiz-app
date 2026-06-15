@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: multiplayer-service
+  namespace: quiz-app
+spec:
+  replicas: 1 # In-Memory-WS-Sessions: vor Skalierung sticky sessions / Redis-PubSub klären
+  selector:
+    matchLabels:
+      app: multiplayer-service
+  template:
+    metadata:
+      labels:
+        app: multiplayer-service
+    spec:
+      containers:
+        - name: multiplayer-service
+          image: quiz-app-multiplayer-service
+          ports:
+            - containerPort: 3000
+          env:
+            - name: ADDRESS
+              value: 0.0.0.0:3000
+            - name: REDIS_URL
+              value: redis://redis:6379
+            - name: QUIZ_SERVICE_URL
+              value: http://quiz-service:3000
+            - name: SCOREBOARD_SERVICE_URL
+              value: http://scoreboard-service:3000
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: quiz-app-secrets
+                  key: JWT_SECRET
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: multiplayer-service
+  namespace: quiz-app
+spec:
+  selector:
+    app: multiplayer-service
+  ports:
+    - port: 3000

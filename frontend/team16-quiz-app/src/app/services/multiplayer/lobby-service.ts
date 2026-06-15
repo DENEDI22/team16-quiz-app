@@ -2,8 +2,7 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { CreateLobbyRequest, Lobby } from '../../models/lobby';
 
-export const MULTIPLAYER_API_URL = 'http://localhost:7001';
-export const MULTIPLAYER_WS_URL = 'ws://localhost:7001';
+export const MULTIPLAYER_API_URL = '/api/multiplayer';
 
 @Injectable({
   providedIn: 'root',

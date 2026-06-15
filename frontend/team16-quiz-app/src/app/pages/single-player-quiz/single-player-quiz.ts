@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { getCategoryLabel, getDifficultyLabel } from '../../models/quiz-options';
 import { GameService } from '../../services/quiz/game-service';
+import { wsUrl } from '../../core/ws-url';
 import { answerStagger, fadeIn, questionSlide } from '../../animations';
 
 @Component({
@@ -46,7 +47,7 @@ export class SinglePlayerQuiz implements OnInit, OnDestroy {
     const state = window.history.state as { categories?: string[]; difficulty?: string };
     const categories = state?.categories ?? [];
     const difficulty = state?.difficulty ?? 'all';
-    this.gameService.startGame('ws://localhost:7000/ws', categories, difficulty);
+    this.gameService.startGame(wsUrl('/api/singleplayer/ws'), categories, difficulty);
 
     history.pushState(null, '', location.href);
     window.addEventListener('popstate', this.blockBack);

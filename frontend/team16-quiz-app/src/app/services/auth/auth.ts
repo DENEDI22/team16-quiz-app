@@ -30,7 +30,7 @@ export class AuthService {
   private http = inject(HttpClient);
   private router = inject(Router);
 
-  private apiUrl = 'http://localhost:3000';
+  private apiUrl = '/api/auth';
   private refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
@@ -55,11 +55,15 @@ export class AuthService {
   refreshToken(): Observable<string> {
     const token = localStorage.getItem('token') ?? '';
     return this.http
-      .post<{ token: string }>(`${this.apiUrl}/refresh`, {}, {
+      .post<AuthResponse>(`${this.apiUrl}/refresh`, {}, {
         headers: { Authorization: `Bearer ${token}` },
       })
       .pipe(
-        map((res) => res.token),
+        map((res) => {
+          const newToken = res.data?.token;
+          if (!newToken) throw new Error('Refresh response contained no token');
+          return newToken;
+        }),
         tap((newToken) => {
           localStorage.setItem('token', newToken);
           this.scheduleRefresh(newToken);
