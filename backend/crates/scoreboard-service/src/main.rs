@@ -142,10 +142,7 @@ async fn highscores(State(state): State<AppState>) -> Response<String> {
     }
 }
 
-async fn answer_history(
-    Auth(claims): Auth,
-    State(state): State<AppState>,
-) -> Response<String> {
+async fn answer_history(Auth(claims): Auth, State(state): State<AppState>) -> Response<String> {
     match get_answer_history(&state.pool, claims.id).await {
         Ok(history) => respond::ok(json!(history)),
         Err(e) => server_error(&e.to_string()),
