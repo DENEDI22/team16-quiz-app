@@ -37,12 +37,16 @@ CREATE TABLE IF NOT EXISTS answers (
 
     // Migrate pre-existing databases: add the new columns if missing and
     // rename the old seconds column to milliseconds (converting the values).
-    sqlx::query("ALTER TABLE answers ADD COLUMN IF NOT EXISTS category text NOT NULL DEFAULT 'Unknown'")
-        .execute(pool)
-        .await?;
-    sqlx::query("ALTER TABLE answers ADD COLUMN IF NOT EXISTS difficulty text NOT NULL DEFAULT 'Unknown'")
-        .execute(pool)
-        .await?;
+    sqlx::query(
+        "ALTER TABLE answers ADD COLUMN IF NOT EXISTS category text NOT NULL DEFAULT 'Unknown'",
+    )
+    .execute(pool)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE answers ADD COLUMN IF NOT EXISTS difficulty text NOT NULL DEFAULT 'Unknown'",
+    )
+    .execute(pool)
+    .await?;
     sqlx::query(
         "
 DO $$
@@ -330,9 +334,7 @@ pub async fn get_account_stats(pool: &PgPool, user_id: Uuid) -> Result<AccountSt
 
 /// Top-10 players by number of duels won (strictly higher score; draws count
 /// for nobody). Usernames are filled in by the handler.
-pub async fn get_duel_leaderboard(
-    pool: &PgPool,
-) -> Result<Vec<DuelLeaderboardEntry>, sqlx::Error> {
+pub async fn get_duel_leaderboard(pool: &PgPool) -> Result<Vec<DuelLeaderboardEntry>, sqlx::Error> {
     let rows: Vec<(Uuid, i64)> = sqlx::query_as(
         "SELECT winner, COUNT(*) AS duels_won
          FROM (

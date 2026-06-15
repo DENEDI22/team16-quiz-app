@@ -1971,6 +1971,7 @@ dependencies = [
  "shared",
  "sqlx",
  "tokio",
+ "tower-http",
  "tracing",
  "tracing-subscriber",
  "uuid",

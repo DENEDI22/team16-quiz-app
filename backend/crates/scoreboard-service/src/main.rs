@@ -19,14 +19,17 @@ use shared::auth::{Auth, JwtSecret};
 use shared::respond;
 use sqlx::PgPool;
 use tokio::{self, net::TcpListener};
+use tower_http::cors::CorsLayer;
 use uuid::Uuid;
 
 use crate::db::{
     get_account_stats, get_answer_history, get_category_leaderboard, get_duel_leaderboard,
-    get_highscores, get_question_stats, get_singleplayer_leaderboard, get_user_duels, insert_answer,
-    insert_duel_result, insert_singleplayer_result, migrate,
+    get_highscores, get_question_stats, get_singleplayer_leaderboard, get_user_duels,
+    insert_answer, insert_duel_result, insert_singleplayer_result, migrate,
 };
-use crate::models::{CreateAnswerRequest, CreateDuelResultRequest, CreateSinglePlayerResultRequest};
+use crate::models::{
+    CreateAnswerRequest, CreateDuelResultRequest, CreateSinglePlayerResultRequest,
+};
 
 /// Minimum answers in a category required to appear on its leaderboard, so a
 /// lone 1/1 answer can't top the accuracy ranking.
@@ -69,7 +72,8 @@ async fn main() {
 
     dotenv().ok();
     let jwt_secret = var("JWT_SECRET").expect("JWT Secret not set in environment");
-    let auth_service_url = var("AUTH_SERVICE_URL").expect("AUTH_SERVICE_URL not set in environment");
+    let auth_service_url =
+        var("AUTH_SERVICE_URL").expect("AUTH_SERVICE_URL not set in environment");
     let pool = sqlx::postgres::PgPoolOptions::new()
         .max_connections(5)
         .connect(&var("DATABASE_URL").unwrap())
@@ -96,6 +100,7 @@ async fn main() {
         .route("/leaderboard/duels", get(leaderboard_duels))
         .route("/leaderboard/singleplayer", get(leaderboard_singleplayer))
         .route("/leaderboard/category", get(leaderboard_category))
+        .layer(CorsLayer::permissive())
         .with_state(state);
 
     // listen globally on port 3000
@@ -286,7 +291,10 @@ async fn resolve_usernames(
     if ids.is_empty() {
         return map;
     }
-    let Some(auth_header) = headers.get(header::AUTHORIZATION).and_then(|v| v.to_str().ok()) else {
+    let Some(auth_header) = headers
+        .get(header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+    else {
         return map;
     };
 

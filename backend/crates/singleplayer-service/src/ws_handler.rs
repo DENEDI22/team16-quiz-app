@@ -318,7 +318,10 @@ fn post_singleplayer_result(
         };
         let result = state
             .http_client
-            .post(format!("{}/singleplayer-result", state.scoreboard_service_url))
+            .post(format!(
+                "{}/singleplayer-result",
+                state.scoreboard_service_url
+            ))
             .header(AUTHORIZATION, format!("Bearer {token}"))
             .json(&payload)
             .send()
