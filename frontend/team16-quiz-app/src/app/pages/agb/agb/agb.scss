@@ -24,11 +24,30 @@ a {
 }
 
 .back-link {
-  display: inline-block;
-  margin-bottom: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  border-radius: 8px;
+  background: #2c1161;
+  color: #ffffff;
+  padding: 0 1rem;
+  margin-bottom: 1.6rem;
+  box-shadow: 0 4px 14px rgba(94, 53, 177, 0.28);
+  transition:
+    background 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
 }
 
-.back-link:hover,
+.back-link:hover {
+  background: #4c2a96;
+  box-shadow: 0 6px 18px rgba(94, 53, 177, 0.34);
+  color: #ffffff;
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+
 a:hover {
   text-decoration: underline;
 }
