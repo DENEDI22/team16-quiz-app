@@ -9,6 +9,8 @@ import {Routes} from '@angular/router';
 import {Login} from './pages/login/login';
 import {Register} from './pages/register/register';
 import { authGuard} from './auth/guards/auth-guard';
+import { Datenschutz } from './pages/datenschutz/datenschutz/datenschutz';
+import { Agb } from './pages/agb/agb/agb';
 
 export const routes: Routes = [
   {
@@ -53,4 +55,12 @@ export const routes: Routes = [
     path: 'register',
     component: Register,
   },
+  {
+    path: 'datenschutz',
+    component: Datenschutz,
+  },
+  {
+    path: 'agb',
+    component: Agb,
+  }
 ];
