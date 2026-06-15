@@ -13,6 +13,7 @@ use axum::{
 };
 use dotenvy::dotenv;
 use serde::Deserialize;
+use tower_http::cors::CorsLayer;
 use serde_json::json;
 use shared::auth::{Auth, JwtSecret};
 use shared::respond;
@@ -72,6 +73,7 @@ async fn main() {
         .route("/question-stats", get(question_stats))
         .route("/highscores", get(highscores))
         .route("/answer-history", get(answer_history))
+        .layer(CorsLayer::permissive())
         .with_state(state);
 
     // listen globally on port 3000
@@ -142,7 +144,10 @@ async fn highscores(State(state): State<AppState>) -> Response<String> {
     }
 }
 
-async fn answer_history(Auth(claims): Auth, State(state): State<AppState>) -> Response<String> {
+async fn answer_history(
+    Auth(claims): Auth,
+    State(state): State<AppState>,
+) -> Response<String> {
     match get_answer_history(&state.pool, claims.id).await {
         Ok(history) => respond::ok(json!(history)),
         Err(e) => server_error(&e.to_string()),
