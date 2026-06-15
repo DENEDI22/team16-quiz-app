@@ -1,0 +1,450 @@
+// Folgt dem Design von single-player-quiz.scss; Duell-spezifisch sind
+// Score-Leiste, Countdown-Balken, Warte-/Offline-Zustände.
+
+.quiz-page {
+  min-height: 100vh;
+  background: #060b2d;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 5rem 1.5rem 2rem;
+  position: relative;
+}
+
+.logo-link {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  width: 134px;
+
+  img { width: 100%; display: block; }
+}
+
+.quiz-card {
+  width: 100%;
+  max-width: 780px;
+  padding: 2rem 2.5rem;
+  border-radius: 20px;
+  background: rgba(8, 17, 58, 0.88);
+  border: 1px solid rgba(128, 232, 255, 0.18);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.42);
+
+  &.result-correct { animation: card-flash-correct 0.65s ease-out; }
+  &.result-wrong   { animation: card-flash-wrong   0.65s ease-out; }
+}
+
+// ── Offline-Banner ───────────────────────────────────────────────────────────
+
+.offline-banner {
+  padding: 0.55rem 1rem;
+  margin-bottom: 1.2rem;
+  border-radius: 10px;
+  background: rgba(255, 206, 99, 0.1);
+  border: 1px solid rgba(255, 206, 99, 0.4);
+  color: #ffce63;
+  font-size: 0.85rem;
+  font-weight: 600;
+
+  &.reconnect-banner {
+    background: rgba(248, 113, 113, 0.1);
+    border-color: rgba(248, 113, 113, 0.45);
+    color: #f87171;
+    animation: track-pulse 1.2s ease-in-out infinite;
+  }
+}
+
+// ── Kopfzeile (Frage + beide Punktestände) ───────────────────────────────────
+
+.quiz-header {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.2rem;
+}
+
+.meta-badge {
+  display: inline-flex;
+  flex-direction: column;
+  padding: 0.35rem 0.8rem;
+  border-radius: 8px;
+  background: rgba(128, 232, 255, 0.08);
+  border: 1px solid rgba(128, 232, 255, 0.22);
+  max-width: 240px;
+
+  &.me {
+    background: rgba(255, 206, 99, 0.1);
+    border-color: rgba(255, 206, 99, 0.38);
+
+    .label { color: #ffce63; }
+  }
+}
+
+.meta-badge .label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #80e8ff;
+  margin-bottom: 0.1rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta-badge strong {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+// ── Countdown-Balken (5-Sekunden-Fenster) ────────────────────────────────────
+
+.time-bar-track {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(128, 232, 255, 0.12);
+  overflow: hidden;
+  margin-bottom: 1.6rem;
+}
+
+.time-bar {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #80e8ff, #ffce63);
+  transition: width 0.1s linear;
+}
+
+// Overtime: Fenster vorbei, Frage wartet auf die erste Antwort
+.time-bar-track.expired {
+  animation: track-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes track-pulse {
+  0%, 100% { background: rgba(248, 113, 113, 0.15); }
+  50%      { background: rgba(248, 113, 113, 0.4); }
+}
+
+.status-hint {
+  margin: 1.4rem 0 0;
+  text-align: center;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+// ── Frage & Antworten (wie Singleplayer) ─────────────────────────────────────
+
+.question-text {
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1.4;
+  margin: 0 0 2rem;
+  color: #fff;
+}
+
+.answers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem;
+}
+
+.answer-button {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.9rem 1.1rem;
+  min-height: 68px;
+  border-radius: 14px;
+  border: 1px solid rgba(128, 232, 255, 0.22);
+  background: rgba(255, 255, 255, 0.05);
+  color: white;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+
+  &:hover:not(:disabled) {
+    transform: translateY(-2px);
+    border-color: #ffce63;
+    background: rgba(255, 206, 99, 0.1);
+  }
+
+  &:disabled { cursor: default; }
+
+  &.selected {
+    background: rgba(255, 206, 99, 0.18);
+    border-color: #ffce63;
+  }
+
+  &.correct {
+    background: rgba(52, 211, 153, 0.18);
+    border-color: #34d399;
+    animation: correct-pulse 0.55s ease-out;
+
+    .answer-letter {
+      background: #34d399;
+      color: #07113e;
+    }
+  }
+
+  &.reveal-correct {
+    background: rgba(52, 211, 153, 0.22);
+    border-color: #34d399;
+    animation: reveal-correct 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.4s both;
+
+    .answer-letter {
+      background: #34d399;
+      color: #07113e;
+    }
+  }
+
+  &.wrong {
+    background: rgba(248, 113, 113, 0.18);
+    border-color: #f87171;
+    animation: shake 0.45s ease;
+
+    .answer-letter {
+      background: #f87171;
+      color: #07113e;
+    }
+  }
+}
+
+.answer-letter {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(128, 232, 255, 0.14);
+  border: 1px solid rgba(128, 232, 255, 0.32);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 0.85rem;
+  color: #80e8ff;
+  transition: background 0.18s, border-color 0.18s, color 0.18s;
+}
+
+.answer-text {
+  flex: 1;
+  line-height: 1.35;
+}
+
+.result-text {
+  margin: 1.4rem 0 0;
+  text-align: center;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+// ── Warte-Bildschirm (Host) ──────────────────────────────────────────────────
+
+.waiting-card {
+  text-align: center;
+
+  h1 {
+    font-size: 1.9rem;
+    font-weight: 900;
+    margin: 0 0 0.4rem;
+  }
+
+  .subtitle {
+    color: rgba(255, 255, 255, 0.6);
+    margin: 0 0 1.5rem;
+  }
+}
+
+.cancel-button {
+  padding: 0 1.6rem;
+  height: 46px;
+  border-radius: 10px;
+  border: 1px solid rgba(248, 113, 113, 0.5);
+  background: rgba(248, 113, 113, 0.12);
+  color: #f87171;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.18s ease;
+
+  &:hover {
+    background: rgba(248, 113, 113, 0.22);
+  }
+}
+
+// ── Fehler / Game Over ───────────────────────────────────────────────────────
+
+.error-card {
+  text-align: center;
+
+  h1 {
+    font-size: 1.9rem;
+    font-weight: 900;
+    margin: 0 0 0.4rem;
+  }
+
+  .subtitle {
+    color: rgba(255, 255, 255, 0.6);
+    margin: 0 0 2rem;
+  }
+}
+
+.game-over-card {
+  text-align: center;
+
+  h1 {
+    font-size: 2.2rem;
+    font-weight: 900;
+    margin: 0 0 0.4rem;
+  }
+
+  .subtitle {
+    color: rgba(255, 255, 255, 0.6);
+    margin: 0 0 2rem;
+  }
+}
+
+.final-scores {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 2.5rem;
+}
+
+.final-player {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 1rem 1.6rem;
+  border-radius: 14px;
+  background: rgba(128, 232, 255, 0.07);
+  border: 1px solid rgba(128, 232, 255, 0.16);
+  min-width: 160px;
+
+  &.winner {
+    background: rgba(255, 206, 99, 0.1);
+    border-color: rgba(255, 206, 99, 0.45);
+
+    .score-number {
+      color: #ffce63;
+      text-shadow: 0 0 32px rgba(255, 206, 99, 0.4);
+    }
+  }
+}
+
+.player-name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.55);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.score-number {
+  font-size: 2.6rem;
+  font-weight: 900;
+  line-height: 1;
+  color: #80e8ff;
+}
+
+.versus {
+  font-size: 0.9rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.home-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 2rem;
+  height: 52px;
+  border-radius: 10px;
+  background: #ffce63;
+  color: #07113e;
+  font-weight: 800;
+  font-size: 1rem;
+  text-decoration: none;
+  transition: box-shadow 0.2s, transform 0.2s;
+  box-shadow: 0 8px 24px rgba(255, 206, 99, 0.3);
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(255, 206, 99, 0.45);
+  }
+}
+
+// ── Laden ────────────────────────────────────────────────────────────────────
+
+.connecting {
+  text-align: center;
+  padding: 2rem 0;
+  color: rgba(255, 255, 255, 0.5);
+
+  .spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid rgba(128, 232, 255, 0.15);
+    border-top-color: #80e8ff;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 1rem;
+  }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes reveal-correct {
+  0%   { transform: scale(1);    box-shadow: 0 0 0 0   rgba(52, 211, 153, 0.7); }
+  40%  { transform: scale(1.05); box-shadow: 0 0 0 14px rgba(52, 211, 153, 0); }
+  70%  { transform: scale(0.98); }
+  100% { transform: scale(1);    box-shadow: 0 0 0 0   rgba(52, 211, 153, 0); }
+}
+
+@keyframes correct-pulse {
+  0%   { transform: scale(1);    box-shadow: 0 0 0 0   rgba(52, 211, 153, 0.55); }
+  40%  { transform: scale(1.03); box-shadow: 0 0 0 10px rgba(52, 211, 153, 0); }
+  100% { transform: scale(1);    box-shadow: 0 0 0 0   rgba(52, 211, 153, 0); }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  15%      { transform: translateX(-7px); }
+  30%      { transform: translateX(7px); }
+  45%      { transform: translateX(-5px); }
+  60%      { transform: translateX(5px); }
+  75%      { transform: translateX(-2px); }
+  90%      { transform: translateX(2px); }
+}
+
+@keyframes card-flash-correct {
+  0%   { border-color: rgba(128, 232, 255, 0.18); box-shadow: 0 24px 64px rgba(0,0,0,0.42); }
+  35%  { border-color: #34d399;                   box-shadow: 0 24px 64px rgba(52, 211, 153, 0.22), 0 0 48px rgba(52, 211, 153, 0.18); }
+  100% { border-color: rgba(128, 232, 255, 0.18); box-shadow: 0 24px 64px rgba(0,0,0,0.42); }
+}
+
+@keyframes card-flash-wrong {
+  0%   { border-color: rgba(128, 232, 255, 0.18); box-shadow: 0 24px 64px rgba(0,0,0,0.42); }
+  35%  { border-color: #f87171;                   box-shadow: 0 24px 64px rgba(248, 113, 113, 0.22), 0 0 48px rgba(248, 113, 113, 0.18); }
+  100% { border-color: rgba(128, 232, 255, 0.18); box-shadow: 0 24px 64px rgba(0,0,0,0.42); }
+}
+
+// ── Responsive ───────────────────────────────────────────────────────────────
+
+@media (max-width: 680px) {
+  .quiz-card { padding: 1.5rem; }
+  .answers { grid-template-columns: 1fr; }
+  .question-text { font-size: 1.25rem; }
+  .final-scores { flex-direction: column; gap: 0.8rem; }
+}

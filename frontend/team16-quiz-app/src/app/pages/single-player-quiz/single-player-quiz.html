@@ -1,0 +1,89 @@
+<main class="quiz-page">
+  <a class="logo-link" routerLink="/">
+    <img src="/assets/images/quiz-logo-clean.png" alt="Team16 Quiz Logo" />
+  </a>
+
+  @if (gameService.gameOver(); as over) {
+    <section class="quiz-card game-over-card" @fadeIn>
+      <h1>Spiel beendet!</h1>
+      <p class="subtitle">Gut gespielt — hier ist dein Ergebnis</p>
+
+      <div class="final-score">
+        <span class="score-number">{{ over.totalScore }}</span>
+        <span class="score-label">Punkte</span>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-item">
+          <strong>{{ over.correctAnswers }}</strong>
+          <span>Richtig</span>
+        </div>
+      </div>
+
+      <a class="home-button" routerLink="/">Zurück zur Startseite</a>
+    </section>
+
+  } @else if (gameService.currentQuestion(); as q) {
+    <section class="quiz-card"
+      [@questionSlide]="q.questionIndex"
+      [class.result-correct]="answerFeedback() === 'correct'"
+      [class.result-wrong]="answerFeedback() === 'wrong'"
+    >
+
+      <div class="quiz-header">
+        <div class="meta-badge">
+          <span class="label">Kategorie</span>
+          <strong>{{ categoryLabel() }}</strong>
+        </div>
+        <div class="meta-badge">
+          <span class="label">Schwierigkeit</span>
+          <strong>{{ difficultyLabel() }}</strong>
+        </div>
+        <div class="meta-badge">
+          <span class="label">Frage</span>
+          <strong>{{ q.questionIndex }}</strong>
+        </div>
+      </div>
+
+      <div class="status-bar">
+        <div class="lives">
+          @for (i of [1, 2, 3]; track i) {
+            <span class="heart" [class.empty]="i > gameService.lives()">❤️</span>
+          }
+        </div>
+        <div class="score-badge">
+          ⭐ {{ gameService.score() }}
+        </div>
+      </div>
+
+      <p class="question-text">{{ q.questionText }}</p>
+
+      <div class="answers" [@answerStagger]="q.questionIndex">
+        @for (option of q.options; track option.id; let i = $index) {
+          <button
+            class="answer-button"
+            type="button"
+            [disabled]="selectedOptionId() !== null"
+            [class.selected]="selectedOptionId() === option.id"
+            [class.correct]="answerFeedback() === 'correct' && option.id === correctAnswerId()"
+            [class.wrong]="answerFeedback() === 'wrong' && option.id === selectedOptionId()"
+            [class.reveal-correct]="answerFeedback() === 'wrong' && option.id === correctAnswerId()"
+            (click)="selectAnswer(option.id)"
+          >
+            <span class="answer-letter">{{ 'ABCD'[i] }}</span>
+            <span class="answer-text">{{ option.text }}</span>
+          </button>
+        }
+      </div>
+
+    </section>
+
+  } @else {
+    <section class="quiz-card">
+      <div class="connecting">
+        <div class="spinner"></div>
+        <p>Verbinde mit Server...</p>
+      </div>
+    </section>
+  }
+</main>

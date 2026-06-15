@@ -1,0 +1,53 @@
+.dialog-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1.5rem;
+  background: #0a1340;
+  border-radius: 16px;
+  min-width: 320px;
+}
+
+h2 {
+  color: white;
+  margin: 0 0 0.8rem;
+  font-weight: 800;
+}
+
+mat-form-field {
+  width: 100%;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 0.4rem;
+
+  button[mat-button] {
+    color: rgba(255, 255, 255, 0.7);
+  }
+}
+
+.mat-mdc-raised-button:disabled {
+  background-color: #5c637d !important;
+  color: #d0d0d0 !important;
+  opacity: 1 !important;
+}
+
+::ng-deep .mat-mdc-text-field-wrapper {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+::ng-deep .mdc-floating-label {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+::ng-deep .mat-mdc-select-value,
+::ng-deep .mat-mdc-input-element {
+  color: white !important;
+}
+
+::ng-deep .mat-mdc-select-arrow {
+  color: white !important;
+}

@@ -10,6 +10,10 @@ pub struct Claims {
     /// The authenticated user's id (subject of the token).
     pub id: Uuid,
     pub email: String,
+    /// Public display name — safe to show to other users (the email is not).
+    /// Defaults to "" for tokens minted before this field existed.
+    #[serde(default)]
+    pub username: String,
     pub role: UserRole,
     pub exp: i64,
 }
@@ -87,6 +91,7 @@ mod tests {
             &Claims {
                 id: Uuid::nil(),
                 email: email.to_string(),
+                username: "tester".to_string(),
                 role,
                 exp,
             },

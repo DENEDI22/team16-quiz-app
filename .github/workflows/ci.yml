@@ -54,8 +54,28 @@ jobs:
         include:
           - service: auth-service
             image: quiz-app-auth-service
+            context: backend
+            file: backend/crates/auth-service/dockerfile
           - service: quiz-service
             image: quiz-app-quiz-service
+            context: backend
+            file: backend/crates/quiz-service/dockerfile
+          - service: scoreboard-service
+            image: quiz-app-scoreboard-service
+            context: backend
+            file: backend/crates/scoreboard-service/dockerfile
+          - service: singleplayer-service
+            image: quiz-app-singleplayer-service
+            context: backend
+            file: backend/crates/singleplayer-service/dockerfile
+          - service: multiplayer-service
+            image: quiz-app-multiplayer-service
+            context: backend
+            file: backend/crates/multiplayer-service/dockerfile
+          - service: frontend
+            image: quiz-app-frontend
+            context: frontend/team16-quiz-app
+            file: frontend/team16-quiz-app/Dockerfile
     steps:
       - uses: actions/checkout@v4
 
@@ -85,8 +105,8 @@ jobs:
       - name: Build and push ${{ matrix.service }}
         uses: docker/build-push-action@v6
         with:
-          context: backend
-          file: backend/crates/${{ matrix.service }}/dockerfile
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
           # amd64 for normal servers, arm64 for the Raspberry Pi 5.
           platforms: linux/amd64,linux/arm64
           push: true

@@ -1,0 +1,56 @@
+<div class="dialog-card">
+  <h2>Lobby erstellen</h2>
+
+  <mat-form-field appearance="outline">
+    <mat-label>Lobby-Name</mat-label>
+    <input
+      matInput
+      [(ngModel)]="name"
+      maxlength="40"
+      placeholder="z.B. Dannys Duell"
+    />
+  </mat-form-field>
+
+  <mat-form-field appearance="outline">
+    <mat-label>Kategorien</mat-label>
+    <mat-select [(ngModel)]="categories" multiple>
+      <mat-option value="All" (click)="toggleAllCategories()">Alle</mat-option>
+      @for (cat of categoryOptions; track cat.value) {
+        <mat-option [value]="cat.value">{{ cat.label }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+
+  <mat-form-field appearance="outline">
+    <mat-label>Schwierigkeit</mat-label>
+    <mat-select [(ngModel)]="difficulty">
+      @for (diff of difficultyOptions; track diff.value) {
+        <mat-option [value]="diff.value">{{ diff.label }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+
+  <mat-form-field appearance="outline">
+    <mat-label>Anzahl Fragen (10–50)</mat-label>
+    <input
+      matInput
+      type="number"
+      [(ngModel)]="questionCount"
+      min="10"
+      max="50"
+    />
+  </mat-form-field>
+
+  <div class="dialog-actions">
+    <button mat-button type="button" (click)="cancel()">Abbrechen</button>
+    <button
+      mat-raised-button
+      color="primary"
+      type="button"
+      [disabled]="!isValid"
+      (click)="create()"
+    >
+      Erstellen
+    </button>
+  </div>
+</div>

@@ -10,6 +10,11 @@ services:
     volumes:
       - ./db-data/:/var/lib/postgresql/
 
+  redis:
+    image: "redis:7-alpine"
+    ports:
+      - 6379:6379
+
   auth:
     build:
       context: ./backend/
@@ -60,6 +65,22 @@ services:
     ports:
       - "7000:3000"
     depends_on:
+      - quiz-service
+
+  multiplayer-service:
+    build:
+      context: ./backend/
+      dockerfile: ./crates/multiplayer-service/dockerfile
+    environment:
+      ADDRESS: "0.0.0.0:3000"
+      JWT_SECRET: dev-only-secret
+      REDIS_URL: "redis://redis:6379"
+      QUIZ_SERVICE_URL: "http://quiz-service:3000"
+      SCOREBOARD_SERVICE_URL: "http://scoreboard-service:3000"
+    ports:
+      - "7001:3000"
+    depends_on:
+      - redis
       - quiz-service
 
 volumes:

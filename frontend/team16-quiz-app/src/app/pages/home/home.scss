@@ -73,6 +73,25 @@
   backdrop-filter: blur(10px);
 }
 
+.nav-button {
+  border: 1px solid rgba(255, 255, 255, 0.44);
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(10px);
+
+  color: white;
+  cursor: pointer;
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: inherit;
+  font-family: inherit;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .hero-content {
   width: min(1180px, calc(100% - 40px));
   margin: auto auto 16vh;
