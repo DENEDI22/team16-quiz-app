@@ -12,6 +12,9 @@ export interface LobbySettings {
   /** [] = alle Kategorien */
   categories: string[];
   questionCount: number;
+  /** Schonfrist pro Frage in Sekunden (5–60): eine frühe Antwort wird zwar
+   *  gewertet, schiebt die Runde aber nicht weiter — schützt vor Panik-Klicks. */
+  answerGraceSeconds: number;
 }
 
 export interface Lobby {
@@ -29,6 +32,9 @@ export interface CreateLobbyRequest {
   difficulty: string;
   categories: string[];
   questionCount: number;
+  /** Schonfrist pro Frage in Sekunden (5–60): eine frühe Antwort wird zwar
+   *  gewertet, schiebt die Runde aber nicht weiter — schützt vor Panik-Klicks. */
+  answerGraceSeconds: number;
 }
 
 // ── Duell-WebSocket-Nachrichten (multiplayer-service) ───────────────────────
@@ -43,6 +49,8 @@ export interface DuelGameStartedMsg {
   host: PlayerInfo;
   guest: PlayerInfo;
   totalQuestions: number;
+  /** Schonfrist pro Frage in Sekunden — steuert den Countdown. */
+  answerGraceSeconds: number;
 }
 
 export interface DuelQuestionMsg {
@@ -79,6 +87,8 @@ export interface DuelResumedMsg {
   guestScore: number;
   questionIndex: number;
   totalQuestions: number;
+  /** Schonfrist pro Frage in Sekunden — steuert den Countdown. */
+  answerGraceSeconds: number;
 }
 
 export interface DuelOpponentDisconnectedMsg {

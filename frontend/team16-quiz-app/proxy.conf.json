@@ -12,5 +12,9 @@
     "target": "http://localhost:7001",
     "ws": true,
     "pathRewrite": { "^/api/multiplayer": "" }
+  },
+  "/api/scoreboard": {
+    "target": "http://localhost:5000",
+    "pathRewrite": { "^/api/scoreboard": "" }
   }
 }

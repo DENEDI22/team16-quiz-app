@@ -5,13 +5,14 @@ use std::env::var;
 
 use axum::{
     Json, Router,
-    extract::{FromRef, State},
+    extract::{FromRef, Query, State},
     http::{HeaderMap, Response, StatusCode, header},
     response::IntoResponse,
     routing::{get, post},
 };
 use chrono::{Duration, Utc};
 use dotenvy::dotenv;
+use serde::Deserialize;
 use serde_json::json;
 use shared::auth::{Auth, JwtSecret};
 use shared::jwt::{Claims, decode_jwt_with_grace, encode_jwt};
@@ -19,8 +20,9 @@ use shared::respond;
 use sqlx::PgPool;
 use tokio::net::TcpListener;
 use tower_http::cors::CorsLayer;
+use uuid::Uuid;
 
-use crate::db::{get_user, migrate};
+use crate::db::{get_user, get_usernames, migrate};
 use crate::{
     db::{create_user, find_user_by_email},
     jwt::{hash_password, verify_password},
@@ -64,6 +66,7 @@ async fn main() {
         .route("/login", post(login_handler))
         .route("/refresh", post(refresh_handler))
         .route("/me", get(me_handler))
+        .route("/users/usernames", get(usernames_handler))
         .layer(cors)
         .with_state(state);
 
@@ -154,6 +157,43 @@ async fn refresh_handler(State(state): State<AppState>, headers: HeaderMap) -> R
 
 async fn me_handler(Auth(claims): Auth) -> Response<String> {
     respond::ok(json!(claims))
+}
+
+#[derive(Debug, Deserialize)]
+struct UsernamesQuery {
+    /// Comma-separated list of user UUIDs.
+    ids: String,
+}
+
+/// Resolves a batch of user ids to their public usernames. Any caller with a
+/// valid token may use it (e.g. scoreboard-service labelling leaderboards);
+/// only the non-sensitive `username` is returned, never the email.
+async fn usernames_handler(
+    Auth(_claims): Auth,
+    State(state): State<AppState>,
+    Query(query): Query<UsernamesQuery>,
+) -> Response<String> {
+    let ids: Vec<Uuid> = query
+        .ids
+        .split(',')
+        .filter(|s| !s.is_empty())
+        .filter_map(|s| Uuid::parse_str(s.trim()).ok())
+        .collect();
+
+    if ids.is_empty() {
+        return respond::ok(json!([]));
+    }
+
+    match get_usernames(&state.pool, &ids).await {
+        Ok(rows) => {
+            let data: Vec<_> = rows
+                .into_iter()
+                .map(|(id, username)| json!({ "id": id.to_string(), "username": username }))
+                .collect();
+            respond::ok(json!(data))
+        }
+        Err(e) => respond::error(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()),
+    }
 }
 
 async fn health() -> impl IntoResponse {

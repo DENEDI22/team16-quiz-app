@@ -101,6 +101,33 @@ export class Register {
         return;
       }
 
+    const formValue = this.registerForm.getRawValue();
+
+    this.authService.register({
+      username: formValue.username!,
+      email: formValue.email!,
+      password: formValue.password!,
+    }).subscribe({
+      next: (response) => {
+        this.isLoading.set(false);
+
+        const token = response.data?.token;
+
+        if (token) {
+          localStorage.setItem('token', token);
+        }
+        this.successMessage.set('Registrierung erfolgreich.');
+        this.router.navigate(['/game-mode']);
+      },
+      error: (error) => {
+        this.isLoading.set(false);
+
+        const message =
+          error.error?.data?.message || 'Registrierung fehlgeschlagen.';
+
+        this.errorMessage.set(message);
+      }
+    });
 
       this.registeruser();
     })

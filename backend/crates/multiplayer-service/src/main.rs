@@ -119,6 +119,9 @@ async fn create_lobby(
     if !(10..=50).contains(&request.question_count) {
         return bad_request("questionCount must be between 10 and 50");
     }
+    if !(5..=60).contains(&request.answer_grace_seconds) {
+        return bad_request("answerGraceSeconds must be between 5 and 60");
+    }
     let name = request.name.trim().to_string();
     if name.is_empty() || name.chars().count() > 40 {
         return bad_request("name must be 1-40 characters");
@@ -131,6 +134,7 @@ async fn create_lobby(
         difficulty: request.difficulty,
         categories: request.categories,
         question_count: request.question_count,
+        answer_grace_seconds: request.answer_grace_seconds,
     };
     let lobby = Lobby {
         id: Uuid::new_v4(),

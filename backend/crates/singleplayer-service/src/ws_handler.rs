@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::models::{
     AnswerOption, ClientMsg, PostAnswerPayload, PreparedQuestion, QuizQuestion,
-    QuizServiceResponse, ServerMsg,
+    QuizServiceResponse, ServerMsg, SinglePlayerResultPayload,
 };
 use crate::{AppState, GameSettings};
 
@@ -63,7 +63,7 @@ pub async fn handle_socket(mut socket: WebSocket, state: AppState, settings: Gam
             return;
         }
 
-        let (submitted_id, answer_id, time_to_answer_seconds, submitted_token) =
+        let (submitted_id, answer_id, time_to_answer_ms, submitted_token) =
             match wait_for_answer(&mut socket).await {
                 Some(v) => v,
                 None => return,
@@ -91,7 +91,9 @@ pub async fn handle_socket(mut socket: WebSocket, state: AppState, settings: Gam
             question.question_id,
             answer_id,
             correct,
-            time_to_answer_seconds,
+            time_to_answer_ms,
+            question.category.clone(),
+            question.difficulty.clone(),
         );
 
         if correct {
@@ -114,6 +116,15 @@ pub async fn handle_socket(mut socket: WebSocket, state: AppState, settings: Gam
         .ok();
 
         if lives == 0 {
+            post_singleplayer_result(
+                state.clone(),
+                token.clone(),
+                session_id,
+                total_score,
+                correct_count as i32,
+                &settings,
+            );
+
             send_msg(
                 &mut socket,
                 &ServerMsg::GameOver {
@@ -159,8 +170,8 @@ async fn wait_for_answer(socket: &mut WebSocket) -> Option<(Uuid, i32, i32, Stri
                     token,
                     question_id,
                     answer_id,
-                    time_to_answer_seconds,
-                }) => return Some((question_id, answer_id, time_to_answer_seconds, token)),
+                    time_to_answer_ms,
+                }) => return Some((question_id, answer_id, time_to_answer_ms, token)),
                 _ => {
                     send_error(socket, "expected submit_answer message").await;
                     return None;
@@ -227,9 +238,12 @@ fn prepare_question(q: QuizQuestion) -> PreparedQuestion {
         question_text: q.question,
         options,
         correct_answer_id,
+        category: q.category,
+        difficulty: q.difficulty,
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn post_answer_to_scoreboard(
     state: AppState,
     token: String,
@@ -237,7 +251,9 @@ fn post_answer_to_scoreboard(
     question_id: Uuid,
     answer_id: i32,
     is_correct: bool,
-    time_to_answer_seconds: i32,
+    time_to_answer_ms: i32,
+    category: String,
+    difficulty: String,
 ) {
     tokio::spawn(async move {
         let payload = PostAnswerPayload {
@@ -245,9 +261,11 @@ fn post_answer_to_scoreboard(
             answer_id,
             is_correct,
             timestamp: Utc::now().to_rfc3339(),
-            time_to_answer_seconds,
+            time_to_answer_ms,
             is_multiplayer: false,
             session_id,
+            category,
+            difficulty,
         };
         let result = state
             .http_client
@@ -264,6 +282,58 @@ fn post_answer_to_scoreboard(
             }
             Ok(_) => {}
             Err(e) => tracing::warn!("failed to post answer to scoreboard: {e}"),
+        }
+    });
+}
+
+/// Fire-and-forget POST of the finished game's aggregate score. The session's
+/// selected settings become the result's bucket (a concrete value or "All").
+fn post_singleplayer_result(
+    state: AppState,
+    token: String,
+    session_id: Uuid,
+    score: i32,
+    correct_answers: i32,
+    settings: &GameSettings,
+) {
+    let difficulty = settings
+        .difficulty
+        .clone()
+        .filter(|d| !d.is_empty())
+        .unwrap_or_else(|| "All".to_string());
+    let categories = settings
+        .categories
+        .clone()
+        .filter(|c| !c.is_empty())
+        .unwrap_or_else(|| "All".to_string());
+
+    tokio::spawn(async move {
+        let payload = SinglePlayerResultPayload {
+            session_id,
+            score,
+            correct_answers,
+            difficulty,
+            categories,
+            timestamp: Utc::now().to_rfc3339(),
+        };
+        let result = state
+            .http_client
+            .post(format!(
+                "{}/singleplayer-result",
+                state.scoreboard_service_url
+            ))
+            .header(AUTHORIZATION, format!("Bearer {token}"))
+            .json(&payload)
+            .send()
+            .await;
+        match result {
+            Ok(resp) if !resp.status().is_success() => {
+                let status = resp.status();
+                let body = resp.text().await.unwrap_or_default();
+                tracing::warn!("scoreboard rejected singleplayer result: {status}: {body}");
+            }
+            Ok(_) => {}
+            Err(e) => tracing::warn!("failed to post singleplayer result to scoreboard: {e}"),
         }
     });
 }
@@ -303,6 +373,8 @@ mod tests {
                 "Computer Personal Unit".to_string(),
                 "Central Processor Unit".to_string(),
             ],
+            category: "Science: Computers".to_string(),
+            difficulty: "easy".to_string(),
         }
     }
 

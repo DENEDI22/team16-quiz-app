@@ -1,0 +1,110 @@
+<main class="global-page">
+  <a class="logo-link" routerLink="/">
+    <img src="/assets/images/quiz-logo-clean.png" alt="Team16 Quiz Logo" />
+  </a>
+
+  <section class="global-card">
+    <header class="card-header">
+      <h1>Globales Ranking</h1>
+      <a class="link-button" routerLink="/scoreboard/account">Mein Profil →</a>
+    </header>
+
+    <nav class="tabs">
+      <button
+        type="button"
+        [class.active]="activeTab() === 'duels'"
+        (click)="selectTab('duels')"
+      >
+        Duelle
+      </button>
+      <button
+        type="button"
+        [class.active]="activeTab() === 'singleplayer'"
+        (click)="selectTab('singleplayer')"
+      >
+        Singleplayer
+      </button>
+      <button
+        type="button"
+        [class.active]="activeTab() === 'category'"
+        (click)="selectTab('category')"
+      >
+        Kategorien
+      </button>
+    </nav>
+
+    <!-- Duels: top-10 by duels won -->
+    @if (activeTab() === 'duels') {
+      <h2>Top 10 — Gewonnene Duelle</h2>
+      @if (duels().length === 0) {
+        <p class="state muted">Noch keine Duelle gespielt.</p>
+      } @else {
+        <ol class="ranking">
+          @for (entry of duels(); track entry.userId; let i = $index) {
+            <li class="rank-row" [class]="'top-' + (i + 1)">
+              <span class="rank-badge">{{ i + 1 }}</span>
+              <span class="username">{{ entry.username || 'Unbekannt' }}</span>
+              <span class="metric">{{ entry.duelsWon }} Siege</span>
+            </li>
+          }
+        </ol>
+      }
+    }
+
+    <!-- Singleplayer: top-10 max score per difficulty -->
+    @if (activeTab() === 'singleplayer') {
+      @if (singleplayer().length === 0) {
+        <p class="state muted">Noch keine Singleplayer-Spiele gespielt.</p>
+      } @else {
+        @for (board of singleplayer(); track board.difficulty) {
+          <h2 class="difficulty-heading">{{ board.difficulty }}</h2>
+          <ol class="ranking">
+            @for (entry of board.entries; track entry.userId; let i = $index) {
+              <li class="rank-row" [class]="'top-' + (i + 1)">
+                <span class="rank-badge">{{ i + 1 }}</span>
+                <span class="username">{{ entry.username || 'Unbekannt' }}</span>
+                <span class="metric">{{ entry.highscore }} Punkte</span>
+              </li>
+            }
+          </ol>
+        }
+      }
+    }
+
+    <!-- Category: top-10 by accuracy in a chosen category -->
+    @if (activeTab() === 'category') {
+      <div class="category-picker">
+        <label for="category-select">Kategorie</label>
+        <select
+          id="category-select"
+          [value]="selectedCategory()"
+          (change)="onCategoryChange($any($event.target).value)"
+        >
+          @for (cat of categories; track cat) {
+            <option [value]="cat">{{ cat }}</option>
+          }
+        </select>
+      </div>
+
+      <h2>Top 10 — Trefferquote</h2>
+      @if (loading()) {
+        <p class="state">Lade …</p>
+      } @else if (categoryEntries().length === 0) {
+        <p class="state muted">Noch nicht genug Antworten in dieser Kategorie.</p>
+      } @else {
+        <ol class="ranking">
+          @for (entry of categoryEntries(); track entry.userId; let i = $index) {
+            <li class="rank-row" [class]="'top-' + (i + 1)">
+              <span class="rank-badge">{{ i + 1 }}</span>
+              <span class="username">{{ entry.username || 'Unbekannt' }}</span>
+              <span class="metric">
+                {{ entry.accuracy * 100 | number: '1.0-0' }}%
+                <small>({{ entry.correctAnswers }}/{{ entry.totalAnswers }})</small>
+              </span>
+            </li>
+          }
+        </ol>
+      }
+    }
+  </section>
+</main>
