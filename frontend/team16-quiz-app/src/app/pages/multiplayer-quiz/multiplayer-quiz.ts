@@ -30,7 +30,7 @@ export class MultiplayerQuiz implements OnInit, OnDestroy {
   answersLocked = computed(() => this.selectedOptionId() !== null || this.duel.lastResult() !== null);
 
   /**
-   * Das 5-Sekunden-Fenster ist (laut Anzeige) vorbei, aber noch kein
+   * Das Antwortfenster ist (laut Anzeige) vorbei, aber noch kein
    * Ergebnis da: niemand hat geantwortet, die Frage wartet auf die erste
    * Antwort ("Overtime").
    */
@@ -78,7 +78,9 @@ export class MultiplayerQuiz implements OnInit, OnDestroy {
   });
 
   /** Breite der Countdown-Leiste in Prozent. */
-  timeBarWidth = computed(() => `${(this.duel.secondsLeft() / 5) * 100}%`);
+  timeBarWidth = computed(
+    () => `${(this.duel.secondsLeft() / this.duel.answerGraceSeconds()) * 100}%`,
+  );
 
   private lobbyId = '';
   private subscriptions = new Subscription();

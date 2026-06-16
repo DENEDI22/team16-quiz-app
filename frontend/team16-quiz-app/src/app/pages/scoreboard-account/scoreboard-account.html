@@ -1,0 +1,88 @@
+<main class="account-page">
+  <a class="logo-link" routerLink="/">
+    <img src="/assets/images/quiz-logo-clean.png" alt="Team16 Quiz Logo" />
+  </a>
+
+  <section class="account-card">
+    <header class="card-header">
+      <h1>Mein Profil</h1>
+      <a class="link-button" routerLink="/scoreboard/global">Globales Ranking →</a>
+    </header>
+
+    @if (loading()) {
+      <p class="state">Lade Statistiken …</p>
+    } @else if (error()) {
+      <p class="state error">Statistiken konnten nicht geladen werden.</p>
+    } @else if (stats(); as s) {
+      <!-- Summary tiles -->
+      <div class="stat-grid">
+        <div class="stat-tile">
+          <span class="stat-value">{{ s.duelsPlayed }}</span>
+          <span class="stat-label">Duelle gespielt</span>
+        </div>
+        <div class="stat-tile">
+          <span class="stat-value">{{ s.winRate * 100 | number: '1.0-0' }}%</span>
+          <span class="stat-label">Siegquote</span>
+        </div>
+        <div class="stat-tile">
+          <span class="stat-value">{{ s.avgMultiplayerScore | number: '1.0-0' }}</span>
+          <span class="stat-label">Ø Multiplayer-Score</span>
+        </div>
+        <div class="stat-tile">
+          <span class="stat-value">{{ s.avgTimeToAnswerMs | number: '1.0-0' }} ms</span>
+          <span class="stat-label">Ø Antwortzeit</span>
+        </div>
+      </div>
+
+      <!-- Singleplayer highscores per difficulty -->
+      <h2>Highscores nach Schwierigkeit</h2>
+      @if (s.highscoresPerDifficulty.length === 0) {
+        <p class="state muted">Noch keine Singleplayer-Spiele gespielt.</p>
+      } @else {
+        <div class="highscore-grid">
+          @for (hs of s.highscoresPerDifficulty; track hs.difficulty) {
+            <div class="highscore-tile">
+              <span class="difficulty">{{ hs.difficulty }}</span>
+              <span class="highscore">{{ hs.highscore }}</span>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- Last 10 duels -->
+      <h2>Letzte 10 Duelle</h2>
+      @if (s.lastDuels.length === 0) {
+        <p class="state muted">Noch keine Duelle gespielt.</p>
+      } @else {
+        <table class="duels-table">
+          <thead>
+            <tr>
+              <th>Gegner</th>
+              <th>Ergebnis</th>
+              <th>Score</th>
+              <th>Datum</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (duel of s.lastDuels; track duel.duelId) {
+              <tr [class]="'outcome-' + duel.outcome">
+                <td>{{ duel.opponentUsername || 'Unbekannt' }}</td>
+                <td>
+                  <span class="outcome-badge">
+                    @switch (duel.outcome) {
+                      @case ('win') { Sieg }
+                      @case ('loss') { Niederlage }
+                      @default { Unentschieden }
+                    }
+                  </span>
+                </td>
+                <td>{{ duel.ownScore }} : {{ duel.opponentScore }}</td>
+                <td>{{ duel.timestamp | date: 'dd.MM.yyyy HH:mm' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    }
+  </section>
+</main>

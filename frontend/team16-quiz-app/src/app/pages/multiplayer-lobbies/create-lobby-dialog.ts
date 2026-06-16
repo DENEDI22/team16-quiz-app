@@ -32,6 +32,7 @@ export class CreateLobbyDialog {
   difficulty = '';
   categories: string[] = [];
   questionCount = 20;
+  answerGraceSeconds = 15;
 
   toggleAllCategories(): void {
     const realSelected = this.categories.filter((c) => c !== 'All');
@@ -47,7 +48,9 @@ export class CreateLobbyDialog {
       !!this.difficulty &&
       this.categories.length > 0 &&
       this.questionCount >= 10 &&
-      this.questionCount <= 50
+      this.questionCount <= 50 &&
+      this.answerGraceSeconds >= 5 &&
+      this.answerGraceSeconds <= 60
     );
   }
 
@@ -59,6 +62,7 @@ export class CreateLobbyDialog {
       difficulty: this.difficulty === 'all' ? '' : this.difficulty,
       categories: this.categories.filter((c) => c !== 'All'),
       questionCount: this.questionCount,
+      answerGraceSeconds: this.answerGraceSeconds,
     };
     this.dialogRef.close(request);
   }

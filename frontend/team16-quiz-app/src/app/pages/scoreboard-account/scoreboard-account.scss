@@ -1,0 +1,159 @@
+.account-page {
+  min-height: 100vh;
+  background: #060b2d;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4.5rem 1.5rem 3rem;
+  position: relative;
+}
+
+.logo-link {
+  position: absolute;
+  top: 1.25rem;
+  left: 1.5rem;
+
+  img {
+    height: 48px;
+    width: auto;
+  }
+}
+
+.account-card {
+  width: 100%;
+  max-width: 900px;
+  padding: 2rem 2.5rem;
+  border-radius: 20px;
+  background: rgba(8, 17, 58, 0.88);
+  border: 1px solid rgba(128, 232, 255, 0.18);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.42);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+
+  h1 {
+    margin: 0;
+    font-size: 1.9rem;
+  }
+}
+
+.link-button {
+  color: #80e8ff;
+  text-decoration: none;
+  font-weight: 700;
+  padding: 0.4rem 0.9rem;
+  border-radius: 10px;
+  border: 1px solid rgba(128, 232, 255, 0.3);
+  transition: background 0.18s ease, border-color 0.18s ease;
+
+  &:hover {
+    background: rgba(128, 232, 255, 0.1);
+    border-color: #80e8ff;
+  }
+}
+
+h2 {
+  font-size: 1.2rem;
+  margin: 2rem 0 1rem;
+  color: #ffce63;
+}
+
+.state {
+  text-align: center;
+  padding: 1.5rem 0;
+  font-size: 1rem;
+
+  &.error { color: #ff8a8a; }
+  &.muted { color: rgba(255, 255, 255, 0.55); }
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1rem;
+}
+
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 1.1rem 1.2rem;
+  border-radius: 14px;
+  background: rgba(128, 232, 255, 0.06);
+  border: 1px solid rgba(128, 232, 255, 0.18);
+
+  .stat-value {
+    font-size: 1.7rem;
+    font-weight: 800;
+    color: #80e8ff;
+  }
+
+  .stat-label {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.7);
+  }
+}
+
+.highscore-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 0.85rem;
+}
+
+.highscore-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 1rem;
+  border-radius: 14px;
+  background: rgba(255, 206, 99, 0.08);
+  border: 1px solid rgba(255, 206, 99, 0.25);
+
+  .difficulty {
+    text-transform: capitalize;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.85);
+  }
+
+  .highscore {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #ffce63;
+  }
+}
+
+.duels-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+
+  th,
+  td {
+    text-align: left;
+    padding: 0.7rem 0.6rem;
+    border-bottom: 1px solid rgba(128, 232, 255, 0.1);
+  }
+
+  th {
+    color: rgba(255, 255, 255, 0.6);
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  tr.outcome-win .outcome-badge { color: #7dffb0; }
+  tr.outcome-loss .outcome-badge { color: #ff8a8a; }
+  tr.outcome-draw .outcome-badge { color: #ffce63; }
+
+  .outcome-badge { font-weight: 700; }
+}

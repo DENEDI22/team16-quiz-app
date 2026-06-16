@@ -31,6 +31,12 @@ pub struct LobbySettings {
     pub difficulty: String,
     pub categories: Vec<String>,
     pub question_count: u32,
+    /// Grace window (seconds) after a question appears: a single early answer
+    /// is locked in (and scored on speed) but does NOT advance the round, so a
+    /// fast click can't cut the opponent off. The round resolves when both have
+    /// answered or the window elapses with at least one answer in. Protects the
+    /// duel from panic-clicking; see `duel.rs`.
+    pub answer_grace_seconds: i32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -47,6 +53,7 @@ pub struct CreateLobbyRequest {
     pub difficulty: String,
     pub categories: Vec<String>,
     pub question_count: u32,
+    pub answer_grace_seconds: i32,
 }
 
 // ---------------------------------------------------------------------------
@@ -88,6 +95,9 @@ pub enum ServerMsg {
         host: PlayerInfo,
         guest: PlayerInfo,
         total_questions: usize,
+        /// Grace window in seconds (see `LobbySettings::answer_grace_seconds`),
+        /// sent so the client's countdown matches the server-enforced window.
+        answer_grace_seconds: u64,
     },
     Question {
         question_index: usize,
@@ -118,6 +128,8 @@ pub enum ServerMsg {
         guest_score: i32,
         question_index: usize,
         total_questions: usize,
+        /// See `GameStarted::answer_grace_seconds`.
+        answer_grace_seconds: u64,
     },
     OpponentDisconnected,
     OpponentReconnected,
@@ -153,6 +165,13 @@ pub struct PreparedQuestion {
     pub question_text: String,
     pub options: Vec<AnswerOption>,
     pub correct_answer_id: i32,
+    /// The question's concrete category and difficulty, forwarded to
+    /// scoreboard-service for category/difficulty leaderboards. `#[serde(default)]`
+    /// keeps older Redis checkpoints (written before these fields) loadable.
+    #[serde(default)]
+    pub category: String,
+    #[serde(default)]
+    pub difficulty: String,
 }
 
 /// Resume point for a running duel, written to Redis at every question
@@ -170,6 +189,11 @@ pub struct DuelCheckpoint {
     pub questions: Vec<PreparedQuestion>,
     /// 0-based index of the next question to play.
     pub next_index: usize,
+    /// Grace window in seconds (see `LobbySettings::answer_grace_seconds`).
+    /// `#[serde(default)]` keeps older Redis checkpoints (written before this
+    /// field) loadable; the duel logic treats 0 as "fall back to the default".
+    #[serde(default)]
+    pub answer_grace_seconds: u64,
 }
 
 /// quiz-service's `{ "success": true, "data": … }` envelope around a question.
@@ -185,6 +209,10 @@ pub struct QuizQuestion {
     pub question: String,
     pub correct_answer: String,
     pub incorrect_answers: Vec<String>,
+    #[serde(default)]
+    pub category: String,
+    #[serde(default)]
+    pub difficulty: String,
 }
 
 /// Body for scoreboard-service's `POST /post-answer`. The user is identified
@@ -196,9 +224,11 @@ pub struct PostAnswerPayload {
     pub answer_id: i32,
     pub is_correct: bool,
     pub timestamp: String,
-    pub time_to_answer_seconds: i32,
+    pub time_to_answer_ms: i32,
     pub is_multiplayer: bool,
     pub session_id: Uuid,
+    pub category: String,
+    pub difficulty: String,
 }
 
 /// Body for scoreboard-service's `POST /duel-results`.
