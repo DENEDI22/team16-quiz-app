@@ -1,3 +1,6 @@
+leotardimport { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { PrivacyConsentDialog } from './privacy-consent-dialog/privacy-consent-dialog';
 import {Component, inject, signal} from '@angular/core';
 import {ReactiveFormsModule, FormBuilder, Validators} from '@angular/forms';
 import {RouterLink} from '@angular/router';
@@ -19,6 +22,8 @@ import {Router} from '@angular/router';
     MatInputModule,
     MatButtonModule,
     MatProgressSpinnerModule,
+    MatDialogModule,
+    MatCheckboxModule,
     RouterLink
   ],
   templateUrl: './register.html',
@@ -29,14 +34,50 @@ export class Register {
   errorMessage = signal('');
   successMessage = signal('');
   private authService = inject(AuthService);
+  private dialog = inject(MatDialog);
   registerForm;
   private router = inject(Router);
+  
 
   constructor(private fb: FormBuilder) {
     this.registerForm = this.fb.group({
       username: ['', [Validators.required, Validators.minLength(3)]],
       email: ['', [Validators.required, Validators.email]],
       password: ['', [Validators.required, Validators.minLength(6)]],
+      privacyAccepted: [false, Validators.requiredTrue],
+    });
+  }
+
+
+  registeruser(){
+
+    this.isLoading.set(true);
+    const formValue = this.registerForm.getRawValue();
+  
+    this.authService.register({
+      username: formValue.username!,
+      email: formValue.email!,
+      password: formValue.password!,
+    }).subscribe({
+      next: (response) => {
+        this.isLoading.set(false);
+
+        const token = response.data?.token;
+
+        if (token) {
+          localStorage.setItem('token', token);
+        }
+        this.successMessage.set('Registrierung erfolgreich.');
+        this.router.navigate(['/game-mode']);
+      },
+      error: (error) => {
+        this.isLoading.set(false);
+
+        const message =
+          error.error?.data?.message || 'Registrierung fehlgeschlagen.';
+
+        this.errorMessage.set(message);
+      }
     });
   }
 
@@ -49,7 +90,16 @@ export class Register {
       return;
     }
 
-    this.isLoading.set(true);
+    const ref = this.dialog.open(PrivacyConsentDialog, {
+      width: '420px',
+      disableClose: true
+    });
+
+    ref.afterClosed().subscribe((accepted: boolean) => {
+      if(!accepted){
+        this.errorMessage.set("Nutzungsbedingung nicht akzeptiert!")
+        return;
+      }
 
     const formValue = this.registerForm.getRawValue();
 
@@ -78,5 +128,8 @@ export class Register {
         this.errorMessage.set(message);
       }
     });
+
+      this.registeruser();
+    })
   }
 }

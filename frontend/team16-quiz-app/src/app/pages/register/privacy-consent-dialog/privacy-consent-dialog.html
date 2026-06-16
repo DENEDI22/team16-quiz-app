@@ -1,0 +1,14 @@
+<h2 mat-dialog-title>Datenschutz</h2>
+
+<mat-dialog-content>
+  <p>
+    Bitte bestätige, dass du mit der Datenschutzerklärung einverstanden bist.
+  </p>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button type="button" (click)="decline()">Ablehnen</button>
+  <button mat-raised-button color="primary" type="button" (click)="accept()">
+    Einverstanden
+  </button>
+</mat-dialog-actions>
