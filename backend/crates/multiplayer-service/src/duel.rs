@@ -228,7 +228,14 @@ async fn run_duel(state: &AppState, lobby: Lobby, mut events: mpsc::Receiver<Due
     guest.send(started_msg);
 
     run_game(
-        state, lobby_id, events, host, guest, session_id, questions, 0,
+        state,
+        lobby_id,
+        events,
+        host,
+        guest,
+        session_id,
+        questions,
+        0,
         answer_grace_seconds,
     )
     .await;
