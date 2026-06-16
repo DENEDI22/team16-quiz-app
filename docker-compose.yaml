@@ -120,21 +120,5 @@ services:
       multiplayer-service:
         condition: service_started
 
-  multiplayer-service:
-    build:
-      context: ./backend/
-      dockerfile: ./crates/multiplayer-service/dockerfile
-    environment:
-      ADDRESS: "0.0.0.0:3000"
-      JWT_SECRET: dev-only-secret
-      REDIS_URL: "redis://redis:6379"
-      QUIZ_SERVICE_URL: "http://quiz-service:3000"
-      SCOREBOARD_SERVICE_URL: "http://scoreboard-service:3000"
-    ports:
-      - "7001:3000"
-    depends_on:
-      - redis
-      - quiz-service
-
 volumes:
   pgdata:
