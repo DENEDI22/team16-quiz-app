@@ -91,7 +91,7 @@ export class Register {
     }
 
     const ref = this.dialog.open(PrivacyConsentDialog, {
-      width: '420px',
+      width: 'min(420px, calc(100vw - 24px))',
       disableClose: true
     });
 

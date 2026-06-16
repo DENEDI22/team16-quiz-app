@@ -1,0 +1,23 @@
+:host {
+  display: block;
+  max-width: 100%;
+}
+
+mat-dialog-actions {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 600px) {
+  h2 {
+    font-size: 1.35rem;
+  }
+
+  mat-dialog-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  button {
+    min-height: 44px;
+  }
+}

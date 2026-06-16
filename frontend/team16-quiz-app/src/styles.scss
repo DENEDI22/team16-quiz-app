@@ -7,6 +7,8 @@
 
 html {
   height: 100%;
+  box-sizing: border-box;
+  -webkit-text-size-adjust: 100%;
   @include mat.theme(
     (
       color: (
@@ -17,6 +19,12 @@ html {
       density: 0,
     )
   );
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: inherit;
 }
 
 body {
@@ -35,6 +43,24 @@ body {
   // Reset the user agent margin.
   margin: 0;
   height: 100%;
+  overflow-x: hidden;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+img,
+svg,
+video {
+  max-width: 100%;
+}
+
+.cdk-overlay-pane {
+  max-width: calc(100vw - 24px) !important;
 }
 /* You can add global styles to this file, and also import other style files */
 
@@ -54,4 +80,14 @@ body {
 
 ::view-transition-new(root) {
   animation: 280ms ease-out fade-in;
+}
+
+@media (max-width: 600px) {
+  .mat-mdc-dialog-container .mdc-dialog__surface {
+    border-radius: 12px;
+  }
+
+  .mat-mdc-dialog-content {
+    max-height: min(70vh, 520px);
+  }
 }

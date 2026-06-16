@@ -2,7 +2,7 @@
 // Score-Leiste, Countdown-Balken, Warte-/Offline-Zustände.
 
 .quiz-page {
-  min-height: 100vh;
+  min-height: 100svh;
   background: #060b2d;
   color: white;
   display: flex;
@@ -68,6 +68,7 @@
 .meta-badge {
   display: inline-flex;
   flex-direction: column;
+  min-width: 0;
   padding: 0.35rem 0.8rem;
   border-radius: 8px;
   background: rgba(128, 232, 255, 0.08);
@@ -98,6 +99,9 @@
   font-size: 0.9rem;
   font-weight: 800;
   color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 // ── Countdown-Balken (5-Sekunden-Fenster) ────────────────────────────────────
@@ -143,6 +147,7 @@
   line-height: 1.4;
   margin: 0 0 2rem;
   color: #fff;
+  overflow-wrap: anywhere;
 }
 
 .answers {
@@ -233,6 +238,8 @@
 .answer-text {
   flex: 1;
   line-height: 1.35;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .result-text {
@@ -443,8 +450,101 @@
 // ── Responsive ───────────────────────────────────────────────────────────────
 
 @media (max-width: 680px) {
-  .quiz-card { padding: 1.5rem; }
-  .answers { grid-template-columns: 1fr; }
-  .question-text { font-size: 1.25rem; }
-  .final-scores { flex-direction: column; gap: 0.8rem; }
+  .quiz-page {
+    align-items: stretch;
+    justify-content: flex-start;
+    padding: 4.75rem 0.75rem 1rem;
+  }
+
+  .logo-link {
+    top: 16px;
+    left: 16px;
+    width: 100px;
+  }
+
+  .quiz-card {
+    padding: 1rem;
+    border-radius: 14px;
+  }
+
+  .quiz-header {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.45rem;
+    margin-bottom: 1rem;
+  }
+
+  .meta-badge {
+    max-width: none;
+    padding: 0.3rem 0.55rem;
+  }
+
+  .meta-badge .label {
+    font-size: 0.62rem;
+  }
+
+  .meta-badge strong {
+    font-size: 0.82rem;
+  }
+
+  .offline-banner {
+    padding: 0.55rem 0.75rem;
+    font-size: 0.8rem;
+  }
+
+  .time-bar-track {
+    margin-bottom: 1.2rem;
+  }
+
+  .answers {
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+  }
+
+  .question-text {
+    font-size: 1.25rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .answer-button {
+    min-height: 56px;
+    padding: 0.75rem;
+    gap: 0.65rem;
+    border-radius: 12px;
+  }
+
+  .answer-letter {
+    width: 30px;
+    height: 30px;
+  }
+
+  .waiting-card h1,
+  .error-card h1 {
+    font-size: 1.55rem;
+  }
+
+  .game-over-card h1 {
+    font-size: 1.8rem;
+  }
+
+  .final-scores {
+    flex-direction: column;
+    gap: 0.8rem;
+  }
+
+  .final-player {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .home-button,
+  .cancel-button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 380px) {
+  .quiz-header {
+    grid-template-columns: 1fr;
+  }
 }

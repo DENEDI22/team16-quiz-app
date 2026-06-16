@@ -1,5 +1,5 @@
 .legal-page {
-  min-height: 100vh;
+  min-height: 100svh;
   background-image: url('/assets/images/quiz-background.png');
   background-position: center;
   background-repeat: no-repeat;
@@ -83,4 +83,34 @@ ul {
   color: #5f5868;
   font-size: 0.9rem;
   margin-top: 2rem;
+}
+
+@media (max-width: 600px) {
+  .legal-page {
+    padding: 0.75rem;
+  }
+
+  .legal-card {
+    padding: 1rem;
+    border-radius: 12px;
+  }
+
+  .md-button {
+    width: 100%;
+    margin-bottom: 1.6rem;
+    text-align: center;
+  }
+
+  h1 {
+    font-size: 1.8rem;
+    line-height: 1.15;
+  }
+
+  h2 {
+    font-size: 1.05rem;
+  }
+
+  ul {
+    padding-left: 1.1rem;
+  }
 }

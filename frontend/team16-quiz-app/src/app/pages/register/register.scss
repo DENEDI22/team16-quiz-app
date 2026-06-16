@@ -1,5 +1,5 @@
 .register-page {
-  min-height: 100vh;
+  min-height: 100svh;
 
   display: flex;
   justify-content: center;
@@ -116,4 +116,40 @@ button {
 
 .switch-page a:hover {
   text-decoration: underline;
+}
+
+@media (max-width: 600px) {
+  .register-page {
+    align-items: flex-start;
+    padding: 0.75rem;
+  }
+
+  .register-card {
+    max-width: none;
+    padding: 0.75rem;
+    border-radius: 12px;
+  }
+
+  .logo-link {
+    width: 132px;
+    min-height: 64px;
+    margin-bottom: 0.35rem;
+  }
+
+  form {
+    gap: 0.85rem;
+  }
+
+  .privacy-consent {
+    padding: 0.75rem;
+  }
+
+  .privacy-error {
+    margin-left: 0;
+  }
+
+  button {
+    min-height: 48px;
+    height: auto;
+  }
 }

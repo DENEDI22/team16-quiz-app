@@ -1,5 +1,5 @@
 .mode-page {
-  min-height: 100vh;
+  min-height: 100svh;
   background: #060b2d;
   color: white;
 
@@ -7,7 +7,8 @@
   justify-content: center;
   align-items: center;
 
-  padding: 2rem;
+  padding: 6rem 2rem 2rem;
+  position: relative;
 }
 
 .mode-container {
@@ -18,6 +19,7 @@
 
 h1 {
   font-size: 3rem;
+  line-height: 1.1;
   margin-bottom: 1rem;
 }
 
@@ -28,7 +30,7 @@ h1 {
 
 .mode-cards {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 2rem;
 }
 
@@ -87,18 +89,35 @@ h1 {
 }
 
 @media (max-width: 768px) {
+  .mode-page {
+    align-items: flex-start;
+    padding: 5rem 1rem 1.25rem;
+  }
+
+  .logo-link {
+    top: 16px;
+    left: 16px;
+    width: 100px;
+  }
+
+  h1 {
+    font-size: 2.15rem;
+  }
+
+  .subtitle {
+    margin-bottom: 1.5rem;
+  }
 
   .mode-cards {
     grid-template-columns: 1fr;
+    gap: 1rem;
   }
 
-}
-.mode-page {
-  min-height: 100vh;
-  background: #060b2d;
-  color: white;
+  .mode-card {
+    padding: 1.25rem;
+    text-align: left;
+  }
 
-  position: relative;
 }
 
 .logo-link {

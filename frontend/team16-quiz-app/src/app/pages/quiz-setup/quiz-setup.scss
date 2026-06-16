@@ -1,5 +1,5 @@
 .setup-page {
-  min-height: 100vh;
+  min-height: 100svh;
   background: #060b2d;
 
   display: flex;
@@ -7,6 +7,7 @@
   align-items: center;
 
   position: relative;
+  padding: 5rem 1rem 1rem;
 }
 
 .logo-link {
@@ -43,6 +44,7 @@
 h1 {
   color: white;
   text-align: center;
+  line-height: 1.15;
 }
 
 .mat-mdc-raised-button:disabled {
@@ -67,5 +69,32 @@ mat-form-field {
 
 ::ng-deep .mat-mdc-select-arrow {
   color: white !important;
+}
+
+@media (max-width: 600px) {
+  .setup-page {
+    align-items: flex-start;
+    padding: 4.75rem 0.75rem 1rem;
+  }
+
+  .logo-link {
+    top: 16px;
+    left: 16px;
+    width: 100px;
+  }
+
+  .setup-card {
+    padding: 1.15rem;
+    border-radius: 12px;
+  }
+
+  h1 {
+    font-size: 1.85rem;
+    margin: 0 0 0.35rem;
+  }
+
+  .start-button {
+    min-height: 48px;
+  }
 }
 

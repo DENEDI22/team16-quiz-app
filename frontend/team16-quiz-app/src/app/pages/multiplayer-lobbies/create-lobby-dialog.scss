@@ -5,7 +5,8 @@
   padding: 1.5rem;
   background: #0a1340;
   border-radius: 16px;
-  min-width: 320px;
+  width: min(420px, 100%);
+  min-width: 0;
 }
 
 h2 {
@@ -50,4 +51,24 @@ mat-form-field {
 
 ::ng-deep .mat-mdc-select-arrow {
   color: white !important;
+}
+
+@media (max-width: 600px) {
+  .dialog-card {
+    padding: 1rem;
+    border-radius: 12px;
+  }
+
+  h2 {
+    font-size: 1.35rem;
+  }
+
+  .dialog-actions {
+    flex-direction: column;
+    align-items: stretch;
+
+    button {
+      min-height: 44px;
+    }
+  }
 }

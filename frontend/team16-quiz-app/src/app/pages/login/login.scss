@@ -1,5 +1,5 @@
 .login-page {
-  min-height: 100vh;
+  min-height: 100svh;
 
   display: flex;
   justify-content: center;
@@ -58,6 +58,7 @@ button {
 .full-width {
   width: 100%;
 }
+
 .switch-page {
   text-align: center;
   margin-top: 1rem;
@@ -70,5 +71,34 @@ button {
 
 .switch-page a:hover {
   text-decoration: underline;
+}
+
+@media (max-width: 600px) {
+  .login-page {
+    align-items: flex-start;
+    padding: 0.75rem;
+  }
+
+  .login-card {
+    max-width: none;
+    padding: 0.75rem;
+    border-radius: 12px;
+  }
+
+  .logo-link {
+    width: 132px;
+    min-height: 64px;
+    margin-bottom: 0.35rem;
+  }
+
+  form {
+    gap: 0.85rem;
+    margin-top: 1rem;
+  }
+
+  button {
+    min-height: 48px;
+    height: auto;
+  }
 }
 

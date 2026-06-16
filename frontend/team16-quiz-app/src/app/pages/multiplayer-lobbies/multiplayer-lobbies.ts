@@ -54,7 +54,7 @@ export class MultiplayerLobbies implements OnInit, OnDestroy {
 
   openCreateDialog(): void {
     const ref = this.dialog.open(CreateLobbyDialog, {
-      width: '480px',
+      width: 'min(480px, calc(100vw - 24px))',
       autoFocus: 'first-tabbable',
     });
     ref.afterClosed().subscribe((request?: CreateLobbyRequest) => {
