@@ -16,6 +16,7 @@ resources:
   - frontend.yaml
   - ingress.yaml
   - ngrok.yaml
+  - keel.yaml
 
 # Zentrale Stelle für Image-Namen/-Tags. newName an den Docker-Hub-Account
 # anpassen (CI pusht als <DOCKERHUB_USERNAME>/quiz-app-<service>).
