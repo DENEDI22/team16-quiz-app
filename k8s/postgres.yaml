@@ -41,6 +41,8 @@ spec:
       labels:
         app: postgres
     spec:
+      nodeSelector:
+        kubernetes.io/hostname: pi1
       containers:
         - name: postgres
           image: postgres:17-alpine
@@ -85,7 +87,9 @@ metadata:
   name: postgres
   namespace: quiz-app
 spec:
+  type: NodePort
   selector:
     app: postgres
   ports:
     - port: 5432
+      nodePort: 30432

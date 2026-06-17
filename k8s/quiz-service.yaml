@@ -4,7 +4,7 @@ metadata:
   name: quiz-service
   namespace: quiz-app
 spec:
-  replicas: 1 # Cron-Sync (OpenTDB) soll nur einmal laufen
+  replicas: 3 # Cron-Sync (OpenTDB) soll nur einmal laufen
   selector:
     matchLabels:
       app: quiz-service

@@ -15,6 +15,7 @@ resources:
   - multiplayer-service.yaml
   - frontend.yaml
   - ingress.yaml
+  - ngrok.yaml
 
 # Zentrale Stelle für Image-Namen/-Tags. newName an den Docker-Hub-Account
 # anpassen (CI pusht als <DOCKERHUB_USERNAME>/quiz-app-<service>).
@@ -22,20 +23,20 @@ resources:
 # siehe docs/k3s-local-cluster-guide.md.
 images:
   - name: quiz-app-auth-service
-    newName: docker.io/CHANGEME/quiz-app-auth-service
+    newName: docker.io/denedi22/quiz-app-auth-service
     newTag: latest
   - name: quiz-app-quiz-service
-    newName: docker.io/CHANGEME/quiz-app-quiz-service
+    newName: docker.io/denedi22/quiz-app-quiz-service
     newTag: latest
   - name: quiz-app-scoreboard-service
-    newName: docker.io/CHANGEME/quiz-app-scoreboard-service
+    newName: docker.io/denedi22/quiz-app-scoreboard-service
     newTag: latest
   - name: quiz-app-singleplayer-service
-    newName: docker.io/CHANGEME/quiz-app-singleplayer-service
+    newName: docker.io/denedi22/quiz-app-singleplayer-service
     newTag: latest
   - name: quiz-app-multiplayer-service
-    newName: docker.io/CHANGEME/quiz-app-multiplayer-service
+    newName: docker.io/denedi22/quiz-app-multiplayer-service
     newTag: latest
   - name: quiz-app-frontend
-    newName: docker.io/CHANGEME/quiz-app-frontend
+    newName: docker.io/denedi22/quiz-app-frontend
     newTag: latest

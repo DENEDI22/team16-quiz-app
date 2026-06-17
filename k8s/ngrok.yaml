@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ngrok
+  namespace: quiz-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ngrok
+  template:
+    metadata:
+      labels:
+        app: ngrok
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: pi1
+      containers:
+        - name: ngrok
+          image: ngrok/ngrok:latest
+          args: ["http", "traefik.kube-system.svc.cluster.local:80"]
+          env:
+            - name: NGROK_AUTHTOKEN
+              value: ""
